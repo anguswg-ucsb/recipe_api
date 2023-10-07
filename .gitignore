@@ -181,5 +181,19 @@ tfplan
 *.tf
 *.tfvars
 
-# Except for main.tf
-!main.tf
+# Except for main.tf: !main.tf
+
+main.tf
+variables.tf
+
+infra/main.tf
+infra/variables.tf
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/terraform.tfvars
+infra/.terraform.lock.hcl
+infra/tfplan
+
+infra/.terraform/
+
+infra/

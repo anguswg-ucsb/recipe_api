@@ -1,19 +1,20 @@
+# Flask and flask_lambda pacakages
 from flask import Flask, request
-# from flask_restful import reqparse, abort, Api, Resource
-import os
+import json
+# from flask import request
+
+# Database packages
 import psycopg2
-import api_utils 
-import config
-
 from psycopg2 import sql
-
 import sqlalchemy
 from sqlalchemy import create_engine
 
-# import rest_api.api_utils
-# import rest_api.config
-# from rest_api.config import Config
+# load environment variables, config, and API functions
+import os
+import api_utils 
+import config
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -50,6 +51,24 @@ def get_dishes():
         conn = connection,
         table_name = "dish_table",
         ingredients = ingredients,
+        limit = 5
+        )
+    return res
+
+
+# look up directions by ingredients resource
+@app.route("/direction")
+def get_directions():
+
+    dishes = request.args.getlist("dishes")
+
+    print(f"Making get request to w/ {dishes}")
+    print(f"type(dishes): {type(dishes)}")
+
+    res = api_utils.getDirections(
+        conn = connection,
+        table_name  = "dish_table",
+        dishes = dishes,
         limit = 5
         )
     return res
