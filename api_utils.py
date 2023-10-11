@@ -1,125 +1,196 @@
 import psycopg2
 from psycopg2 import sql
 import json
+from config import Config
 
-# TODO: Fix this function to return the directions for the specified dish or return directions for a list of dishes
-def getDirections(conn, table_name, dishes, limit = 20):
+# TODO: PROBABLY ALL CAN BE DELETED, CODE WAS MOVED OVER TO crud.py
 
-    """
-    Get dishes from the database that contain the specified ingredients.
-
-    Args:
-        conn (psycopg2.extensions.connection): Connection to the database.
-        table_name (str): Name of the table to query.
-        ingredients (str or list): Ingredients to search for.
-        limit (int): Maximum number of results to return.
-
-    Returns:
-        dict: A dictionary of dishes and their ingredients.
-    """
+# Database connection function
+def get_db_conn():
+    conn = psycopg2.connect(
+        dbname=Config.DATABASE_NAME,
+        user=Config.DATABASE_USER,
+        password=Config.DATABASE_PW,
+        host=Config.DATABASE_HOST,
+        port=Config.DATABASE_PORT
+    )
+    return conn
     
-    if isinstance(dishes, str):
-        dishes = [dishes]
+def get_dishes_by_ingredients2(ingredients, limit = 20):
+    print(f"Making get request to w/ {ingredients}")
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    
+    try:
+        # json encode the ingredients list
+        ingredients = json.dumps(ingredients)
+        # ingredients =  "[" + ', '.join(f'"{ingredient}"' for ingredient in ingredients) + "]"
+    
+        # limit the highest number of results to return
+        if limit and limit > 100:
+            limit = 100
 
-    dishes =  "[" + ', '.join(f'"{dish}"' for dish in dishes) + "]"
+        # if a limit was specified, use it, otherwise return all results
+        if limit:
+            query = sql.SQL("""
+                        SELECT dish, ingredients
+                        FROM dish_table
+                        WHERE ingredients -> 'ingredients' @> %s
+                        LIMIT {}
+                        """).format(sql.Literal(limit))
+            
+        else:
+            query = sql.SQL("""
+                        SELECT dish, ingredients
+                        FROM dish_table
+                        WHERE ingredients -> 'ingredients' @> %s
+                        """)
+        # Execute the query with the specified ingredient
+        cursor.execute(query, (ingredients, ))
 
-    # limit the highest number of results to return
-    if limit and limit > 100:
-        limit = 100
+        # Commit changes to the database
+        conn.commit()
 
-    # if a limit was specified, use it, otherwise return all results
-    if limit:
-        query = sql.SQL("""
-                    SELECT directions, dishes
-                    FROM {}
-                    WHERE ingredients -> 'ingredients' @> %s
-                    LIMIT {}
-                    """).format(sql.Identifier(table_name), sql.Literal(limit))
+        # Fetch all the rows that match the query
+        db_rows = cursor.fetchall() 
+    
+        # convert the returned dishes to a key-value pair (dish: ingredients)
+        dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
+
+        return dishes
+    
+    except Exception as e:
+        # Handle database errors
+        raise e
+    finally:
+        cursor.close()
+        conn.close()
+
+
+
+# # TODO: Fix this function to return the directions for the specified dish or return directions for a list of dishes
+# def getDirections(conn, table_name, dishes, limit = 20):
+
+#     """
+#     Get dishes from the database that contain the specified ingredients.
+
+#     Args:
+#         conn (psycopg2.extensions.connection): Connection to the database.
+#         table_name (str): Name of the table to query.
+#         ingredients (str or list): Ingredients to search for.
+#         limit (int): Maximum number of results to return.
+
+#     Returns:
+#         dict: A dictionary of dishes and their ingredients.
+#     """
+    
+#     if isinstance(dishes, str):
+#         dishes = [dishes]
+
+#     dishes =  "[" + ', '.join(f'"{dish}"' for dish in dishes) + "]"
+
+#     # limit the highest number of results to return
+#     if limit and limit > 100:
+#         limit = 100
+
+#     # if a limit was specified, use it, otherwise return all results
+#     if limit:
+#         query = sql.SQL("""
+#                     SELECT directions, dishes
+#                     FROM {}
+#                     WHERE ingredients -> 'ingredients' @> %s
+#                     LIMIT {}
+#                     """).format(sql.Identifier(table_name), sql.Literal(limit))
         
-    else:
-        query = sql.SQL("""
-                    SELECT directions, dishes
-                    FROM {}
-                    WHERE ingredients -> 'ingredients' @> %s
-                    """).format(sql.Identifier(table_name))
+#     else:
+#         query = sql.SQL("""
+#                     SELECT directions, dishes
+#                     FROM {}
+#                     WHERE ingredients -> 'ingredients' @> %s
+#                     """).format(sql.Identifier(table_name))
 
-    # Create cursor object to interact with the database
-    cur = conn.cursor()
+#     # Create cursor object to interact with the database
+#     cur = conn.cursor()
 
-    # Execute the query with the specified ingredient
-    cur.execute(query, (dishes, ))
+#     # Execute the query with the specified ingredient
+#     cur.execute(query, (dishes, ))
 
-    # Commit changes to the database
-    conn.commit()
+#     # Commit changes to the database
+#     conn.commit()
 
-    # Fetch all the rows that match the query
-    db_rows = cur.fetchall() 
+#     # Fetch all the rows that match the query
+#     db_rows = cur.fetchall() 
     
-    # convert the returned dishes to a key-value pair (dish: ingredients)
-    dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
+#     # convert the returned dishes to a key-value pair (dish: ingredients)
+#     dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
     
-    cur.close()
+#     cur.close()
 
-    return dishes
+#     return dishes
 
-def getDishes(conn, table_name, ingredients, limit = 20):
+# def getDishes(conn, table_name, ingredients, limit = 20):
 
-    """
-    Get dishes from the database that contain the specified ingredients.
+#     """
+#     Get dishes from the database that contain the specified ingredients.
 
-    Args:
-        conn (psycopg2.extensions.connection): Connection to the database.
-        table_name (str): Name of the table to query.
-        ingredients (str or list): Ingredients to search for.
-        limit (int): Maximum number of results to return.
+#     Args:
+#         conn (psycopg2.extensions.connection): Connection to the database.
+#         table_name (str): Name of the table to query.
+#         ingredients (str or list): Ingredients to search for.
+#         limit (int): Maximum number of results to return.
 
-    Returns:
-        dict: A dictionary of dishes and their ingredients.
-    """
+#     Returns:
+#         dict: A dictionary of dishes and their ingredients.
+#     """
     
-    if isinstance(ingredients, str):
-        ingredients = [ingredients]
+#     if not isinstance(ingredients, list):
+#         raise TypeError("ingredients must be of type list")
+    
+#     # if isinstance(ingredients, str):
+#     #     ingredients = [ingredients]
 
-    ingredients =  "[" + ', '.join(f'"{ingredient}"' for ingredient in ingredients) + "]"
+#     # json encode the ingredients list
+#     ingredients = json.dumps(ingredients)
+#     # ingredients =  "[" + ', '.join(f'"{ingredient}"' for ingredient in ingredients) + "]"
+    
+#     # limit the highest number of results to return
+#     if limit and limit > 100:
+#         limit = 100
 
-    # limit the highest number of results to return
-    if limit and limit > 100:
-        limit = 100
-
-    # if a limit was specified, use it, otherwise return all results
-    if limit:
-        query = sql.SQL("""
-                    SELECT dish, ingredients
-                    FROM {}
-                    WHERE ingredients -> 'ingredients' @> %s
-                    LIMIT {}
-                    """).format(sql.Identifier(table_name), sql.Literal(limit))
+#     # if a limit was specified, use it, otherwise return all results
+#     if limit:
+#         query = sql.SQL("""
+#                     SELECT dish, ingredients
+#                     FROM {}
+#                     WHERE ingredients -> 'ingredients' @> %s
+#                     LIMIT {}
+#                     """).format(sql.Identifier(table_name), sql.Literal(limit))
         
-    else:
-        query = sql.SQL("""
-                    SELECT dish, ingredients
-                    FROM {}
-                    WHERE ingredients -> 'ingredients' @> %s
-                    """).format(sql.Identifier(table_name))
+#     else:
+#         query = sql.SQL("""
+#                     SELECT dish, ingredients
+#                     FROM {}
+#                     WHERE ingredients -> 'ingredients' @> %s
+#                     """).format(sql.Identifier(table_name))
 
-    # Create cursor object to interact with the database
-    cur = conn.cursor()
+#     # Create cursor object to interact with the database
+#     cur = conn.cursor()
 
-    # Execute the query with the specified ingredient
-    cur.execute(query, (ingredients, ))
+#     # Execute the query with the specified ingredient
+#     cur.execute(query, (ingredients, ))
 
-    # Commit changes to the database
-    conn.commit()
+#     # Commit changes to the database
+#     conn.commit()
 
-    # Fetch all the rows that match the query
-    db_rows = cur.fetchall() 
+#     # Fetch all the rows that match the query
+#     db_rows = cur.fetchall() 
     
-    # convert the returned dishes to a key-value pair (dish: ingredients)
-    dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
+#     # convert the returned dishes to a key-value pair (dish: ingredients)
+#     dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
     
-    cur.close()
+#     cur.close()
 
-    return dishes
+#     return dishes
 
 # def getDishes(conn, table_name, ingredients, limit = 20):
 
