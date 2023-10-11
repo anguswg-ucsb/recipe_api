@@ -1,2 +1,3 @@
 # recipe_api
-Flask REST API repository for food matcher
+
+FastAPI REST API code repository for food matcher app
