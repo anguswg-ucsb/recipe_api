@@ -3,6 +3,8 @@ from psycopg2 import sql
 import json
 from config import Config
 
+# TODO: PROBABLY ALL CAN BE DELETED, CODE WAS MOVED OVER TO crud.py
+
 # Database connection function
 def get_db_conn():
     conn = psycopg2.connect(
@@ -14,7 +16,7 @@ def get_db_conn():
     )
     return conn
     
-def get_dishes_by_ingredients(ingredients, limit = 20):
+def get_dishes_by_ingredients2(ingredients, limit = 20):
     print(f"Making get request to w/ {ingredients}")
     conn = get_db_conn()
     cursor = conn.cursor()
