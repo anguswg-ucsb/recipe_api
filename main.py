@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 # from database import SessionLocal, engine
 
 from config import Config
-
 import crud
 import json
 
