@@ -1,17 +1,20 @@
+from fastapi import Depends, FastAPI, HTTPException,  Query
+from mangum import Mangum
+import uvicorn
+
 import psycopg2
 from psycopg2 import sql
 from typing import Union
 
-from fastapi import Depends, FastAPI, HTTPException,  Query
-import uvicorn
-# from sqlalchemy.orm import Session
-# from database import SessionLocal, engine
-
-from config import Config
+from app.config import Config
 import crud
 import json
 
+# instantiate FastAPI app
 app = FastAPI()
+
+# wrao the app in Mangum for AWS Lambda
+handler = Mangum(app)
 
 # function that makes a database connection
 def get_db_conn():
