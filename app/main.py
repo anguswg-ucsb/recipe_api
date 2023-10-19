@@ -1,10 +1,10 @@
 import psycopg2
 from psycopg2 import sql
-import sqlalchemy
 from typing import Union
 
 from fastapi import Depends, FastAPI, HTTPException,  Query
-from sqlalchemy.orm import Session
+import uvicorn
+# from sqlalchemy.orm import Session
 # from database import SessionLocal, engine
 
 from config import Config
@@ -115,6 +115,8 @@ def get_percent_match_by_ingredients(ingredients: Union[list[str], None] = Query
         cursor.close()
         conn.close()
 
+if __name__ == "__main__":
+   uvicorn.run(app, host="0.0.0.0", port=8080)
 
 ##########################
 # OLD code to delete later

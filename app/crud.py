@@ -1,4 +1,3 @@
-from sqlalchemy import sql
 from typing import Union
 
 from fastapi import Depends, FastAPI, HTTPException,  Query
