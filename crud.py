@@ -6,10 +6,10 @@ import json
 import psycopg2
 from psycopg2 import sql
 
-def get_dishes_by_ingredients(conn, cursor, ingredients, limit = 20):
+def _query_dishes_by_ingredients(conn, cursor, ingredients, limit = 20):
 
     """
-    Get dishes that contain the specified ingredients.
+    SQL query to get dishes that contain the specified ingredients.
 
     Args:
         conn (psycopg2.connection): Connection to the database.
@@ -67,10 +67,10 @@ def get_dishes_by_ingredients(conn, cursor, ingredients, limit = 20):
 
     return dishes
 
-def get_directions_by_ingredients(conn, cursor, ingredients, limit = 20):
+def _query_directions_by_ingredients(conn, cursor, ingredients, limit = 20):
 
     """
-    Get dish directions that contain the specified ingredients.
+    SQL query to get dish directions that contain the specified ingredients.
 
     Args:
         conn (psycopg2.connection): Connection to the database.
@@ -131,11 +131,11 @@ def get_directions_by_ingredients(conn, cursor, ingredients, limit = 20):
 
     return directions
 
-def get_dishes_by_id(conn, cursor, dish_id, limit = 20):
+def _query_dishes_by_id(conn, cursor, dish_id, limit = 20):
 # def get_dishes_by_ingredients(conn, table_name, ingredients, limit = 20):
 
     """
-    Get dishes by dish_id primary key in database.
+    SQL query to get dishes by dish_id primary key in database.
 
     Args:
         conn (psycopg2.connection): Connection to the database.
@@ -186,6 +186,73 @@ def get_dishes_by_id(conn, cursor, dish_id, limit = 20):
     dishes_by_id = {db_rows[i][1]: db_rows[i][0] for i in range(0, len(db_rows))}
 
     return dishes_by_id
+
+# TODO: this function isnt working yet
+def _query_percent_match_by_ingredients(conn, cursor, ingredients, limit = 20):
+
+    """
+    SQL query to get dishes that contain the specified ingredients, and percent match to full ingredient list.
+
+    Args:
+        conn (psycopg2.connection): Connection to the database.
+        cursor (psycopg2.cursor): Cursor object to interact with the database.
+        ingredients (str or list): Ingredients to search for.
+        limit (int): Maximum number of results to return.
+        
+    Returns:
+        dict: A dictionary of dishes and the percent of matching ingredients.
+    """
+    
+    # if isinstance(ingredients, str):
+    #     ingredients = [ingredients]
+
+    # ingredients =  "[" + ', '.join(f'"{ingredient}"' for ingredient in ingredients) + "]"
+
+    # json encode the ingredients list
+    ingredients = json.dumps(ingredients)
+    
+    # limit the highest number of results to return
+    if limit and limit > 100:
+        limit = 100
+
+    table_name = "dish_table"
+
+    # if a limit was specified, use it, otherwise return all results
+    if limit:
+        query = sql.SQL("""
+                    SELECT dish, ingredients
+                    FROM {}
+                    WHERE ingredients -> 'ingredients' @> %s
+                    LIMIT {}
+                    """).format(sql.Identifier(table_name), sql.Literal(limit))
+        
+    else:
+        query = sql.SQL("""
+                    SELECT dish, ingredients
+                    FROM {}
+                    WHERE ingredients -> 'ingredients' @> %s
+                    """).format(sql.Identifier(table_name))
+
+
+    # Execute the query with the specified ingredient
+    cursor.execute(query, (ingredients, ))
+
+    # Commit changes to the database
+    conn.commit()
+
+    # Fetch all the rows that match the query
+    db_rows = cursor.fetchall() 
+    print(f"Number of returned rows: {len(db_rows)}")
+    
+    # convert the returned dishes to a key-value pair (dish: ingredient match percentage)
+    percent_match = {db_rows[i][0]: len(ingredients) / len(db_rows[i][1] for i in range(0, len(db_rows)))}
+
+    return percent_match
+
+
+
+
+
 
 # def get_dishes_by_ingredients(db: Session, ingredients: list, limit: int = 20):
 # # def get_dishes_by_ingredients(conn, table_name, ingredients, limit = 20):

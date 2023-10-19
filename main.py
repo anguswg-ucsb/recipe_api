@@ -26,14 +26,14 @@ def get_db_conn():
 
 # look up dishes by ingredients resource
 @app.get("/dishes/")
-def get_dishes(ingredients: Union[list[str], None] = Query(default=None), limit: int = 20):
+def get_dishes_by_ingredients(ingredients: Union[list[str], None] = Query(default=None), limit: int = 20):
     
     print(f"Making get request to w/ {ingredients}")
     conn = get_db_conn()
     cursor = conn.cursor()
     
     try:
-        dishes = crud.get_dishes_by_ingredients(conn=conn, cursor=cursor, ingredients=ingredients, limit=limit)
+        dishes = crud._query_dishes_by_ingredients(conn=conn, cursor=cursor, ingredients=ingredients, limit=limit)
         return dishes
     except Exception as e:
         # Handle database errors
@@ -44,14 +44,14 @@ def get_dishes(ingredients: Union[list[str], None] = Query(default=None), limit:
 
 # look up directions by ingredients resource
 @app.get("/directions/")
-def get_directions(ingredients: Union[list[str], None] = Query(default=None), limit: int = 20):
+def get_directions_by_ingredients(ingredients: Union[list[str], None] = Query(default=None), limit: int = 20):
     
     print(f"Making get request to w/ {ingredients}")
     conn = get_db_conn()
     cursor = conn.cursor()
     
     try:
-        directions = crud.get_directions_by_ingredients(conn=conn, cursor=cursor, ingredients=ingredients, limit=limit)
+        directions = crud._query_directions_by_ingredients(conn=conn, cursor=cursor, ingredients=ingredients, limit=limit)
         return directions
     except Exception as e:
         # Handle database errors
@@ -69,8 +69,26 @@ def get_dishes_by_id(dish_id: Union[list[int], None] = Query(default=None), limi
     cursor = conn.cursor()
     
     try:
-        directions = crud.get_dishes_by_id(conn=conn, cursor=cursor, dish_id=dish_id, limit=limit)
+        directions = crud._query_dishes_by_id(conn=conn, cursor=cursor, dish_id=dish_id, limit=limit)
         return directions
+    except Exception as e:
+        # Handle database errors
+        raise e
+    finally:
+        cursor.close()
+        conn.close()
+
+# look up dishes and match percentage by ingredients resource
+@app.get("/percent-match/")
+def get_percent_match_by_ingredients(ingredients: Union[list[str], None] = Query(default=None), limit: int = 20):
+    
+    print(f"Making get request to w/ {ingredients}")
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    
+    try:
+        percent_match = crud._query_percent_match_by_ingredients(conn=conn, cursor=cursor, ingredients=ingredients, limit=limit)
+        return percent_match
     except Exception as e:
         # Handle database errors
         raise e
