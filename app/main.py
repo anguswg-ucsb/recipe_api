@@ -1,20 +1,21 @@
 from fastapi import Depends, FastAPI, HTTPException,  Query
-from mangum import Mangum
+# from mangum import Mangum
 import uvicorn
 
 import psycopg2
 from psycopg2 import sql
 from typing import Union
 
-from app.config import Config
-import crud
+from config import Config
+# import app.crud as crud
+from crud import _query_dishes_by_ingredients, _query_ingredients_by_dishes, _query_dishes_by_id, _query_directions_by_dish_id, _query_percent_match_by_ingredients
 import json
 
 # instantiate FastAPI app
 app = FastAPI()
 
-# wrao the app in Mangum for AWS Lambda
-handler = Mangum(app)
+# # wrao the app in Mangum for AWS Lambda
+# handler = Mangum(app)
 
 # function that makes a database connection
 def get_db_conn():
