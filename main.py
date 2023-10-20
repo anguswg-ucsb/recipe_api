@@ -6,9 +6,10 @@ import psycopg2
 from psycopg2 import sql
 from typing import Union
 
-from config import Config
+from app.config import Config
 # import app.crud as crud
-from crud import _query_dishes_by_ingredients, _query_ingredients_by_dishes, _query_dishes_by_id, _query_directions_by_dish_id, _query_percent_match_by_ingredients
+# from crud import _query_dishes_by_ingredients, _query_ingredients_by_dishes, _query_dishes_by_id, _query_directions_by_dish_id, _query_percent_match_by_ingredients
+import app.crud as crud
 import json
 
 # instantiate FastAPI app
