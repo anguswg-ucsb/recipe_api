@@ -179,16 +179,16 @@ terraform.tfvars
 .terraform/
 tfplan
 
-# Ignore all .tf files
-*.tf
+# # Ignore all .tf files
 *.tfvars
+**/.terraform/
 
-# Except for main.tf: !main.tf
+# # Except for main.tf: !main.tf
 
-main.tf
-variables.tf
+# # main.tf *.tf
+# variables.tf
 
-infra/main.tf
+# # infra/main.tf
 infra/variables.tf
 infra/terraform.tfstate
 infra/terraform.tfstate.backup
@@ -196,6 +196,22 @@ infra/terraform.tfvars
 infra/.terraform.lock.hcl
 infra/tfplan
 
-infra/.terraform/
+# infra/.terraform/
 
-infra/
+# infra/
+# Ignore all files in the 'infra' directory
+infra/*
+!infra/main.tf
+
+*.pyc
+lib
+*.zip
+
+package
+
+deploy
+deploy/
+deploy/lambda_function.zip
+
+.DS_Store
+**/.DS_Store

@@ -1,6 +1,5 @@
 import app.config as config
 import psycopg2
-from sqlalchemy import create_pool_from_url
 
 # function that makes a database connection
 def get_db_conn():

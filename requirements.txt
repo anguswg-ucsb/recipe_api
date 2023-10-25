@@ -1,18 +1,17 @@
 annotated-types==0.6.0
 anyio==3.7.1
-asyncio==3.4.3
-asyncpg==0.28.0
 click==8.1.7
-fastapi==0.104.0
+fastapi==0.99.1 # pinning to 0.99.1 to avoid breaking changes in 0.100.0
+# fastapi==0.104.0
 h11==0.14.0
 idna==3.4
 mangum==0.17.0
 psycopg2-binary==2.9.9
-pydantic==2.4.2
-pydantic_core==2.10.1
+pydantic==1.10.12 # pinning to 1.10.12 to avoid breaking changes in 2.0.0
+# pydantic==2.4.2 
+# pydantic_core==2.10.1
 python-dotenv==1.0.0
 sniffio==1.3.0
-SQLAlchemy==2.0.22
 starlette==0.27.0
 typing_extensions==4.8.0
 uvicorn==0.23.2
