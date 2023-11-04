@@ -10,7 +10,6 @@ from app.api.db import get_db_conn
 
 router = APIRouter()
 
-# TODO: needs to be finished 
 # Look up ingredients by search_str
 @router.get("/")
 def get_suggested_ingredients(search_str: Union[list[int], None] = Query(default=None), limit: int = 20):
