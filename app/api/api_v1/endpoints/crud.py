@@ -231,7 +231,7 @@ def _query_ingredients_by_dishes(conn, cursor, dishes, limit = 20):
 
 
 
-def _query_suggested_ingredients(conn, cursor, search_str, limit = 20):
+def _query_suggested_ingredients(conn, cursor, search, limit):
 
     """
     SQL query to get ingredients that contain the specified search string.
@@ -239,17 +239,17 @@ def _query_suggested_ingredients(conn, cursor, search_str, limit = 20):
     Args:
         conn (psycopg2.connection): Connection to the database.
         cursor (psycopg2.cursor): Cursor object to interact with the database.
-        search_str (str): String to search for ingredients.
+        search (str): String to search for ingredients.
         limit (int): Maximum number of results to return.
         
     Returns:
         dict: A dictionary of suggested ingredients.
     """
 
-    print(f"Getting ANY ingredients with search string: {search_str}")
+    print(f"Getting ANY ingredients with search string: {search}")
 
     # Join search terms with '<->' operators, remove trailing '<->'
-    search_str = ' '.join([f"{term} <->" for term in search_str.split()])[:-4]
+    search = ' '.join([f"{term} <->" for term in search.split()])[:-4]
 
     # Limit the highest number of results to return
     if limit and limit > 100:
@@ -273,7 +273,7 @@ def _query_suggested_ingredients(conn, cursor, search_str, limit = 20):
 
 
     # Execute the query with the specified ingredient
-    cursor.execute(query, (search_str, ))
+    cursor.execute(query, (search, ))
 
     # Commit changes to the database
     conn.commit()
@@ -365,8 +365,8 @@ def _query_suggested_ingredients(conn, cursor, search_str, limit = 20):
 # from psycopg2 import sql
 # import json
 
-# search_str = 'chi'
-# search_str = ' '.join([f"{term} <->" for term in search_str.split()])[:-4]
+# search = 'chi'
+# search = ' '.join([f"{term} <->" for term in search.split()])[:-4]
 
 # limit = 3
 
@@ -388,7 +388,7 @@ def _query_suggested_ingredients(conn, cursor, search_str, limit = 20):
 #                     """).format(sql.Literal(limit))
 
 # # Execute the query with the specified ingredient
-# cursor.execute(query, (search_str, ))
+# cursor.execute(query, (search, ))
 
 # # Fetch all the rows that match the query
 # db_rows = cursor.fetchall()
