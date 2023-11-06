@@ -1,19 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException,  Query
-import uvicorn
+from fastapi import APIRouter, Query
 from typing import Union
-
-import psycopg2
-from psycopg2 import sql
-
 from app.api.api_v1.endpoints.crud import _query_directions_by_id
 from app.api.db import get_db_conn
 
 router = APIRouter()
 
-# Look up directions by dish_id
 @router.get("/")
-def get_directions_by_id(dish_id: Union[list[int], None] = Query(default=None), limit: int = 20):
-    
+def get_directions_by_id(
+    dish_id: Union[list[int], None] = Query(default=None),
+    limit: int = 20
+):
+    """
+    Get directions for a specific dish by its ID.
+
+    Args:
+        dish_id (Union[list[int], None]): List of dish IDs. Defaults to None.
+        limit (int): The maximum number of directions to return. Defaults to 20.
+
+    Returns:
+        list: List of directions for the specified dish IDs.
+    """
+
     print(f"Getting directions for dish_id {dish_id}")
 
     # Connect to the DB
@@ -21,10 +28,17 @@ def get_directions_by_id(dish_id: Union[list[int], None] = Query(default=None), 
     cursor = conn.cursor()
     
     try:
-        directions = _query_directions_by_id(conn=conn, cursor=cursor, dish_id=dish_id, limit=limit)
+        # Try to query directions by dish ID
+        directions = _query_directions_by_id(
+            conn=conn, cursor=cursor, dish_id=dish_id, limit=limit
+        )
         return directions
+
     except Exception as e:
-        raise e # Handle database errors
+        # Handle any exceptions that occur during the query
+        raise e
+
     finally:
+        # Close the cursor and connection, regardless of whether an exception occurred
         cursor.close()
         conn.close()
