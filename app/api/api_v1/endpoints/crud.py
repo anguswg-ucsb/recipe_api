@@ -1,7 +1,7 @@
 import json
 from psycopg2 import sql
 
-def _query_directions_by_id(conn, cursor, dish_id, limit):
+def _query_directions_by_dish_id(conn, cursor, dish_id, limit):
 
     """
     SQL query to get directions by dish_id primary key in database.
@@ -57,7 +57,7 @@ def _query_directions_by_id(conn, cursor, dish_id, limit):
 
 
 
-def _query_dishes_by_id(conn, cursor, dish_id, limit):
+def _query_dishes_by_dish_id(conn, cursor, dish_id, limit):
 
     """
     SQL query to get dishes by dish_id primary key in database.
@@ -352,15 +352,15 @@ def _query_suggested_ingredients(conn, cursor, search, limit):
 
 
 
-# WORKING ON SUGGESTED INGREDIENTS ----------------------------------------------------------------
+# WORKING ON PCT MATCH ----------------------------------------------------------------
 
 # import app.config as config
 # import psycopg2
 # from psycopg2 import sql
 # import json
 
-# search = 'chi'
-# search = ' '.join([f"{term} <->" for term in search.split()])[:-4]
+# ingredients = 'chicken'
+# ingredients = json.dumps(ingredients)
 
 # limit = 3
 
@@ -375,14 +375,17 @@ def _query_suggested_ingredients(conn, cursor, search, limit):
 # cursor = conn.cursor()
 
 # query = sql.SQL("""
-#                     SELECT ingredients
-#                     FROM unique_ingredients_table
-#                     WHERE to_tsvector('english', ingredients) @@ to_tsquery('english', %s || ':*')
-#                     LIMIT {}
-#                     """).format(sql.Literal(limit))
+#         SELECT dish, 
+#             ingredients,
+#             jsonb_array_length(%s::jsonb) / jsonb_array_length(ingredients->'ingredients')::float as match_percentage
+#         FROM dish_table
+#         WHERE ingredients -> 'ingredients' @> %s
+#         ORDER BY match_percentage DESC
+#         LIMIT {}
+#         """).format(sql.Literal(limit))
 
 # # Execute the query with the specified ingredient
-# cursor.execute(query, (search, ))
+# cursor.execute(query, (ingredients, ))
 
 # # Fetch all the rows that match the query
 # db_rows = cursor.fetchall()

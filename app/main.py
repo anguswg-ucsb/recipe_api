@@ -1,10 +1,7 @@
 
 from fastapi import FastAPI
 from app.api.api_v1.api import router as api_router
-
 from mangum import Mangum
-
-import uvicorn
 
 app = FastAPI()
 
