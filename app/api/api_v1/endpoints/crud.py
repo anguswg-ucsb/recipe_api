@@ -1,13 +1,7 @@
-from typing import Union
-
-from fastapi import Depends, FastAPI, HTTPException,  Query
 import json
-import psycopg2
 from psycopg2 import sql
 
-
-
-def _query_directions_by_id(conn, cursor, dish_id, limit = 20):
+def _query_directions_by_id(conn, cursor, dish_id, limit):
 
     """
     SQL query to get directions by dish_id primary key in database.
@@ -63,7 +57,7 @@ def _query_directions_by_id(conn, cursor, dish_id, limit = 20):
 
 
 
-def _query_dishes_by_id(conn, cursor, dish_id, limit = 20):
+def _query_dishes_by_id(conn, cursor, dish_id, limit):
 
     """
     SQL query to get dishes by dish_id primary key in database.
@@ -117,7 +111,7 @@ def _query_dishes_by_id(conn, cursor, dish_id, limit = 20):
 
 
 
-def _query_dishes_by_ingredients(conn, cursor, ingredients, limit = 20):
+def _query_dishes_by_ingredients(conn, cursor, ingredients, limit):
 
     """
     SQL query to get dishes that contain the specified ingredients.
@@ -177,7 +171,7 @@ def _query_dishes_by_ingredients(conn, cursor, ingredients, limit = 20):
 
 
 # TODO: function needs to be completed
-def _query_ingredients_by_dishes(conn, cursor, dishes, limit = 20):
+def _query_ingredients_by_dishes(conn, cursor, dishes, limit):
 
     """
     SQL query to get ingredients that correspond to the specified dish name(s).
@@ -292,7 +286,7 @@ def _query_suggested_ingredients(conn, cursor, search, limit):
 # TODO: ensure this is working correctly
 # TODO: needs an endpoint file
 # TODO: needs a route in api
-# def _query_percent_match_by_ingredients(conn, cursor, ingredients, limit=20):
+# def _query_percent_match_by_ingredients(conn, cursor, ingredients, limit):
 #     """
 #     SQL query to get dishes that contain the specified ingredients, and percent match to full ingredient list.
 

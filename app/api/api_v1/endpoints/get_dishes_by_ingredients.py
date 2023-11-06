@@ -30,7 +30,7 @@ def get_dishes_by_ingredients(
     try:
         # Try to query dishes by ingredients
         dishes = _query_dishes_by_ingredients(
-            conn=conn, cursor=cursor, ingredients=ingredients, limit=limit
+            conn = conn, cursor = cursor, ingredients = ingredients, limit = limit
         )
         return dishes
 

@@ -30,7 +30,7 @@ def get_dishes_by_id(
     try:
         # Try to query dishes by dish ID
         dishes = _query_dishes_by_id(
-            conn=conn, cursor=cursor, dish_id=dish_id, limit=limit
+            conn = conn, cursor = cursor, dish_id = dish_id, limit = limit
         )
         return dishes
 

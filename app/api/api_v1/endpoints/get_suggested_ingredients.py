@@ -30,7 +30,7 @@ def get_suggested_ingredients(
     try:
         # Try to query suggested ingredients by search string
         ingredients = _query_suggested_ingredients(
-            conn=conn, cursor=cursor, search=search, limit=limit
+            conn = conn, cursor = cursor, search = search, limit = limit
         )
         return ingredients
 

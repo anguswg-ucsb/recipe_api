@@ -30,7 +30,7 @@ def get_directions_by_id(
     try:
         # Try to query directions by dish ID
         directions = _query_directions_by_id(
-            conn=conn, cursor=cursor, dish_id=dish_id, limit=limit
+              conn = conn, cursor = cursor, dish_id = dish_id, limit = limit
         )
         return directions
 
