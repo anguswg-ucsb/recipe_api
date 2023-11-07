@@ -38,6 +38,7 @@ def get_suggested_ingredients(
         # Handle any exceptions that occur during the query
         raise e
 
+
     finally:
         # Close the cursor and connection, regardless of whether an exception occurred
         cursor.close()
