@@ -78,7 +78,7 @@ You've stumbled upon the backend engine of the soon-to-be `PantryMatch` web appl
 > 1    ['Place chipped beef on bottom of baking dish.', 'Place chicken on top of beef an...]
 > 2    ['In a slow cooker, combine all ingredients.', 'Cover and cook on low for 4 hours...]
 > ```
-> <br/> 
+> 
 > 
 > ## **Database Schema** <a name="subparagraph3"></a>
 > 
@@ -118,6 +118,7 @@ Next, let's get into some detailed information about each endpoint in the works,
 * Description: Retrieves recommendations for ingredients based on partial input, returning a list of suggested ingredients that closely match the provided criteria.
 * Input: `search` (str): Partial ingredient name to search for.
 * Return: A dictionary mapping `'suggestions'` to a list of suggested ingredients {'suggestions': [ingredients]}
+<br/>
 
 ## **Contributions** <a name="contributions"></a>
 The recipe data used in this project was obtained from the [RecipeNLG GitHub Repository](https://github.com/Glorf/recipenlg/tree/main), authored by [Glorf](https://github.com/Glorf). We want to express our gratitude to [Glorf](https://github.com/Glorf) for making this dataset available to the community. Without you, our recipes might have been limited to PB&Js. 
