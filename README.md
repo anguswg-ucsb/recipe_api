@@ -3,8 +3,6 @@
 # **PantryMatch FastAPI REST API**
 Discover recipes using ingredients on hand.
 
-<svg xmlns="http://www.w3.org/2000/svg" width="233.390625" height="35" viewBox="0 0 233.390625 35"><rect width="86.015625" height="35" fill="#eac177"/><rect x="86.015625" width="147.375" height="35" fill="#b6d7a8"/><text x="43.0078125" y="17.5" font-size="12" font-family="'Roboto', sans-serif" fill="#FFFFFF" text-anchor="middle" alignment-baseline="middle" letter-spacing="2">MADE BY</text><text x="159.703125" y="17.5" font-size="12" font-family="'Montserrat', sans-serif" fill="#FFFFFF" text-anchor="middle" font-weight="900" alignment-baseline="middle" letter-spacing="2">HUNGRY PEOPLE</text></svg>
-
 </center>
 
 ______________________________________________________________________________
@@ -19,7 +17,6 @@ ______________________________________________________________________________
 6. [Usage](#usage)
 7. [Contributions](#contributions)
 8. [License](#license)
-<br/>
 <br/>
 
 ## **Introduction** <a name="introduction"></a>
@@ -92,8 +89,6 @@ You've stumbled upon the backend engine of the soon-to-be `PantryMatch` web appl
 > 
 > ![database tables](images/db_tables.png "db_tables")
 > 
-<br/>
-<br/>
 
 ## **Usage** <a name="usage"></a>
 
@@ -123,8 +118,6 @@ Next, let's get into some detailed information about each endpoint in the works,
 * Description: Retrieves recommendations for ingredients based on partial input, returning a list of suggested ingredients that closely match the provided criteria.
 * Input: `search` (str): Partial ingredient name to search for.
 * Return: A dictionary mapping `'suggestions'` to a list of suggested ingredients {'suggestions': [ingredients]}
-<br/>
-<br/>
 
 ## **Contributions** <a name="contributions"></a>
 The recipe data used in this project was obtained from the [RecipeNLG GitHub Repository](https://github.com/Glorf/recipenlg/tree/main), authored by [Glorf](https://github.com/Glorf). We want to express our gratitude to [Glorf](https://github.com/Glorf) for making this dataset available to the community. Without you, our recipes might have been limited to PB&Js. 
