@@ -18,8 +18,12 @@ provider "aws" {
 #################
 
 locals {
-  csv_file_path = "/Users/anguswatters/Desktop/recipes_data/dish_recipes2.csv"
-  unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes_data/unique_ingredients.csv"
+  # csv_file_path = "/Users/anguswatters/Desktop/recipes_data/dish_recipes2.csv"
+  # unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes_data/unique_ingredients.csv"
+
+  csv_file_path = "/Users/anguswatters/Desktop/recipes/data/output/dish_recipes2.csv"
+  unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes/data/output/unique_ingredients.csv"
+
   # csv_file_path = "data/dish_recipes2.csv"
   # unique_ingred_file_path = "data/unique_ingredients.csv"
   # process_csv_lambda_path = "lambda/process_csv_lambda.zip"
@@ -566,8 +570,399 @@ resource "aws_security_group" "lambda_sg" {
 
 }
 
+# # give AWS lambda resource based policy for api gateway
+# resource "aws_lambda_permission" "api_gw_perms" {
+#   statement_id  = "AllowExecutionFromAPIGateway"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.dish_api_lambda.function_name
+#   principal     = "apigateway.amazonaws.com"
+
+#   source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*"
+
+# }
+
+# # # lambda permissions to allow s3 to invoke lambda
+# resource "aws_lambda_permission" "lambda_s3_permission" {
+#   statement_id  = "AllowExecutionFromS3Bucket"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.s3_to_db_lambda.arn
+#   principal = "s3.amazonaws.com"
+#   # source_arn = "arn:aws:s3:::dish_recipes_bucket"
+#   source_arn = aws_s3_bucket.dish_recipes_bucket.arn
+# }
+
+# # # lambda permissions to allow RDS to invoke lambda
+# resource "aws_lambda_permission" "lambda_api_gw_permission" {
+#   statement_id  = "AllowExecutionFromAPIGateway"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.dish_api_lambda.arn
+#   principal =  "apigateway.amazonaws.com"
+#   source_arn = aws_api_gateway_rest_api.dish_rest_api.execution_arn
+#   #   source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*/*"
+
+# }
+
 # read in already made security group for lambda to connect with EC2
 #data "aws_security_group" "lambda_sg" {
 #  # id = var.lambda_sg_id
 #  name = var.lambda_sg_name
 # }
+
+# ---------------------
+# ---- API Gateway ----
+# ---------------------
+
+# # Create an IAM role for API Gateway to execute your Lambda function
+# resource "aws_iam_role" "api_gateway_execution_role" {
+#   name = "api_gateway_execution_role"
+
+#   assume_role_policy = <<EOF
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Action": "sts:AssumeRole",
+#       "Effect": "Allow",
+#       "Principal": {
+#         "Service": "apigateway.amazonaws.com"
+#       }
+#     }
+#   ]
+# }
+# EOF
+# }
+# # Create an IAM role for API Gateway to invoke the Lambda function
+# resource "aws_iam_role" "api_gateway_invoke_role" {
+#   name = "api_gateway_invoke_role"
+
+#   assume_role_policy = <<EOF
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Principal": {
+#         "Service": "apigateway.amazonaws.com"
+#       },
+#       "Action": "sts:AssumeRole"
+#     }
+#   ]
+# }
+# EOF
+# }
+
+# # Attach an IAM policy to the role allowing API Gateway to invoke Lambda functions
+# resource "aws_iam_role_policy" "api_gateway_invoke_policy" {
+#   name   = "api_gateway_invoke_policy"
+#   role   = aws_iam_role.api_gateway_invoke_role.id
+
+#   policy = <<EOF
+# {
+#   "Version": "2012-10-17",
+#   "Statement": [
+#     {
+#       "Effect": "Allow",
+#       "Action": "lambda:InvokeFunction",
+#       "Resource": "${aws_lambda_function.dish_api_lambda.arn}"
+#     }
+#   ]
+# }
+# EOF
+# }
+
+# # Attach the AWSLambdaRole policy to the IAM role
+# resource "aws_iam_role_policy_attachment" "api_gateway_execution_role_policy" {
+#   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
+#   role       = aws_iam_role.api_gateway_execution_role.name
+# }
+
+# resource "aws_lambda_permission" "api_gateway_lambda_permissions" {
+#   statement_id  = "AllowExecutionFromAPIGateway"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.dish_api_lambda.function_name
+#   principal     = "apigateway.amazonaws.com"
+
+#   source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*/{proxy+}"
+# }
+
+# Create an IAM role for API Gateway to execute and invoke the Lambda function
+resource "aws_iam_role" "api_gateway_role" {
+  name = "api_gateway_role"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "apigateway.amazonaws.com"
+      }
+    }
+  ]
+}
+EOF
+}
+
+# Attach policies to the role allowing API Gateway to execute and invoke Lambda functions
+resource "aws_iam_role_policy_attachment" "api_gateway_role_policies" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
+  role       = aws_iam_role.api_gateway_role.name
+}
+
+resource "aws_iam_policy" "api_gateway_invoke_policy" {
+  name        = "api_gateway_invoke_policy"
+  description = "Policy for API Gateway to invoke Lambda functions"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = "lambda:InvokeFunction",
+        Resource = aws_lambda_function.dish_api_lambda.arn,
+      },
+    ],
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "api_gateway_invoke_role_policy_attachment" {
+  policy_arn = aws_iam_policy.api_gateway_invoke_policy.arn
+  role       = aws_iam_role.api_gateway_role.name
+}
+
+# Create an API Gateway REST API
+resource "aws_api_gateway_rest_api" "dish_rest_api" {
+  name        = "dish-rest-api"
+  description = "Dishes REST API"
+}
+
+# ------------------------------
+# ---- API GATEWAY Resource ----
+# ------------------------------
+
+# Create a resource
+resource "aws_api_gateway_resource" "dish_resource" {
+  path_part   = "{proxy+}"
+  # path_part   = "resource"
+  rest_api_id = aws_api_gateway_rest_api.dish_rest_api.id
+  parent_id   = aws_api_gateway_rest_api.dish_rest_api.root_resource_id
+}
+
+# --------------------------------
+# ---- API GATEWAY ANY METHOD ----
+# --------------------------------
+# ANY - METHOD 
+# Create an ANY method (proxy integration) for the resource
+resource "aws_api_gateway_method" "dish_api_any_method" {
+  rest_api_id   = aws_api_gateway_rest_api.dish_rest_api.id
+  resource_id   = aws_api_gateway_resource.dish_resource.id
+  http_method   = "ANY"
+  authorization = "NONE"
+}
+
+# ANY - INTEGRATION
+# Configure the Lambda function integration for ANY METHOD
+resource "aws_api_gateway_integration" "lambda_any_integration" {
+  rest_api_id             = aws_api_gateway_rest_api.dish_rest_api.id
+  resource_id             = aws_api_gateway_resource.dish_resource.id
+  http_method             = aws_api_gateway_method.dish_api_any_method.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.dish_api_lambda.invoke_arn
+  # uri = "arn:aws:apigateway:${var.region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${var.region}:${var.account_number}:function:${aws_lambda_function.dish_api_lambda.function_name}/invocations"
+  #   request_parameters = {
+  #   "method.request.path.proxy" = true
+  # }
+}
+
+# ANY - METHOD RESPONSE
+resource "aws_api_gateway_method_response" "any_200" {
+  rest_api_id   = aws_api_gateway_rest_api.dish_rest_api.id
+  resource_id   = aws_api_gateway_resource.dish_resource.id
+  http_method   = "ANY"
+  status_code = "200"
+
+  depends_on = [
+    aws_api_gateway_integration.lambda_any_integration
+  ]
+  response_models = {
+     "application/json" = "Empty"
+  }
+
+}
+
+# ANY - INTEGRATION RESPONSE
+resource "aws_api_gateway_integration_response" "any_intergration_response" {
+
+  rest_api_id   = aws_api_gateway_rest_api.dish_rest_api.id
+  resource_id   = aws_api_gateway_resource.dish_resource.id
+  http_method   = "ANY"
+  status_code   = aws_api_gateway_method_response.any_200.status_code
+
+   response_templates = {
+       "application/json" = ""
+   } 
+  depends_on = [
+    aws_api_gateway_integration.lambda_any_integration
+  ]
+}
+
+# # --------------------------------
+# # ---- API GATEWAY GET METHOD ----
+# # --------------------------------
+
+# # import {
+# #   to = aws_api_gateway_method_response.dish_api_get_method
+# #   id = "2eabgdgz3f/k4m280/GET/200"
+# # }
+# # terraform import aws_api_gateway_method_response.dish_api_get_method 2eabgdgz3f/k4m280/GET/200
+# # terraform import aws_api_gateway_method_response.dish_api_get_method2 2eabgdgz3f/k4m280/GET/200
+
+# # GET - METHOD
+# # Create a GET method (proxy integration) for the resource
+# resource "aws_api_gateway_method" "dish_api_get_method" {
+#   rest_api_id   = aws_api_gateway_rest_api.dish_rest_api.id
+#   resource_id   = aws_api_gateway_resource.dish_resource.id
+#   http_method   = "GET"
+#   authorization = "NONE"
+#   #   request_parameters = {
+#   #   "method.request.path.proxy" = true
+#   # }
+# }
+
+# # GET - INTEGRATION
+# # Configure the Lambda function integration
+# resource "aws_api_gateway_integration" "lambda_get_integration" {
+#   rest_api_id             = aws_api_gateway_rest_api.dish_rest_api.id
+#   resource_id             = aws_api_gateway_resource.dish_resource.id
+#   http_method             = aws_api_gateway_method.dish_api_get_method.http_method
+#   integration_http_method = "POST"
+#   type                    = "AWS_PROXY"
+#   uri                     = aws_lambda_function.dish_api_lambda.invoke_arn
+# }
+
+# # GET - METHOD RESPONSE
+# resource "aws_api_gateway_method_response" "get_200" {
+#   rest_api_id   = aws_api_gateway_rest_api.dish_rest_api.id
+#   resource_id   = aws_api_gateway_resource.dish_resource.id
+#   http_method   = "GET"
+#   status_code = "200"
+
+#   depends_on = [
+#     aws_api_gateway_integration.lambda_get_integration
+#   ]
+#   response_models = {
+#      "application/json" = "Empty"
+#   }
+# }
+
+# # GET - INTEGRATION RESPONSE
+# resource "aws_api_gateway_integration_response" "get_intergration_response" {
+
+#   rest_api_id   = aws_api_gateway_rest_api.dish_rest_api.id
+#   resource_id   = aws_api_gateway_resource.dish_resource.id
+#   http_method   = "GET"
+#   status_code   = aws_api_gateway_method_response.get_200.status_code
+
+#   depends_on = [
+#     aws_api_gateway_integration.lambda_get_integration
+#   ]
+
+#   response_templates = {
+#        "application/json" = ""
+#    } 
+# }
+
+# resource "aws_lambda_permission" "lambda_api_gw_permission" {
+#   statement_id  = "AllowExecutionFromAPIGateway"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.dish_api_lambda.arn
+#   principal     = "apigateway.amazonaws.com"
+
+#   source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*/*"
+# }
+
+# ------------------------------------------------
+# ---- Lambda resource policy for API Gateway ----
+# ------------------------------------------------
+
+# Lambda resource policy for API Gateway
+resource "aws_lambda_permission" "lambda_api_gw_permission" {
+  statement_id  = "AllowExecutionFromAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.dish_api_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  # source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*/*"
+  # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
+  # source_arn = "arn:aws:execute-api:${var.region}:${var.account_number}:${aws_api_gateway_rest_api.dish_rest_api.id}/*/${aws_api_gateway_method.dish_api_any_method.http_method}${aws_api_gateway_resource.dish_resource.path}"
+  source_arn = "arn:aws:execute-api:${var.region}:${var.account_number}:${aws_api_gateway_rest_api.dish_rest_api.id}/*/*/*"
+  # source_arn = "arn:aws:execute-api:${var.region}:${var.account_number}:${aws_api_gateway_rest_api.dish_rest_api.id}/*/${aws_api_gateway_method.dish_api_any_method.http_method}${aws_api_gateway_resource.dish_resource.path}"
+
+}
+
+# ----------------------------------------
+# ---- API GATEWAY DEPLOYMENT + STAGE ----
+# ----------------------------------------
+
+# Create a deployment for the API
+resource "aws_api_gateway_deployment" "dish_api_deployment" {
+  depends_on = [
+    aws_api_gateway_integration.lambda_any_integration
+    # aws_api_gateway_integration.lambda_get_integration
+    ]
+
+  rest_api_id = aws_api_gateway_rest_api.dish_rest_api.id
+  stage_name  = var.api_gw_stage_name
+}
+
+# # Create a stage for the deployment
+# resource "aws_api_gateway_stage" "dish_api_stage" {
+#   deployment_id = aws_api_gateway_deployment.dish_api_deployment.id
+#   rest_api_id   = aws_api_gateway_rest_api.dish_rest_api.id
+#   stage_name    = var.api_gw_stage_name
+
+#   # # CloudWatch Logs settings
+#   # depends_on = [aws_cloudwatch_log_group.example]
+# }
+
+# # method settings for API gateway and allowing cloudwatch logs/metrics
+# resource "aws_api_gateway_method_settings" "dish_api_method_settings" {
+#   rest_api_id = aws_api_gateway_rest_api.dish_rest_api.id
+#   stage_name  = aws_api_gateway_stage.dish_api_stage.stage_name
+#   method_path = "*/*"
+
+#   settings {
+#     metrics_enabled = true
+#     logging_level   = "INFO"
+#   }
+# }
+
+# ---------------------------------------
+# ---- Cloudwatch Logs (API Gateway) ----
+# ---------------------------------------
+
+# # Create a CloudWatch Logs group for API Gateway
+# resource "aws_cloudwatch_log_group" "dish_api_gw_logs" {
+#   name              = "API-Gateway-Execution-Logs_${aws_api_gateway_rest_api.dish_api_deployment.id}/${var.stage_name}"
+#   retention_in_days = 7
+# }
+
+# -----------------
+# ---- OUTPUTS ----
+# -----------------
+
+# Output the URL of the API Gateway deployment
+output "api_gateway_url" {
+  value = aws_api_gateway_deployment.dish_api_deployment.invoke_url
+}
+
+# Output the URL of the API Gateway deployment
+output "api_gateway_rest_api_id" {
+  value = aws_api_gateway_rest_api.dish_rest_api.id
+}
+
+output "api_gateway_rest_api_execution_arn_custom_ALL" {
+  value = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*/*"
+}
