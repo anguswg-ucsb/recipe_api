@@ -23,13 +23,6 @@ locals {
 
   csv_file_path = "/Users/anguswatters/Desktop/recipes/data/output/dish_recipes2.csv"
   unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes/data/output/unique_ingredients.csv"
-
-  # csv_file_path = "data/dish_recipes2.csv"
-  # unique_ingred_file_path = "data/unique_ingredients.csv"
-  # process_csv_lambda_path = "lambda/process_csv_lambda.zip"
-  # s3_to_db_lambda_path = "lambda/s3_to_db.zip"
-  # create_user_lambda_path = "lambda/create_user.zip"
-  # psychopg2_zip_path ="lambda/psycopg2-py38.zip"
   api_lambda_zip = "../deploy/lambda_function.zip"
 }
 
@@ -570,16 +563,6 @@ resource "aws_security_group" "lambda_sg" {
 
 }
 
-# # give AWS lambda resource based policy for api gateway
-# resource "aws_lambda_permission" "api_gw_perms" {
-#   statement_id  = "AllowExecutionFromAPIGateway"
-#   action        = "lambda:InvokeFunction"
-#   function_name = aws_lambda_function.dish_api_lambda.function_name
-#   principal     = "apigateway.amazonaws.com"
-
-#   source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*"
-
-# }
 
 # # # lambda permissions to allow s3 to invoke lambda
 # resource "aws_lambda_permission" "lambda_s3_permission" {
@@ -602,88 +585,10 @@ resource "aws_security_group" "lambda_sg" {
 
 # }
 
-# read in already made security group for lambda to connect with EC2
-#data "aws_security_group" "lambda_sg" {
-#  # id = var.lambda_sg_id
-#  name = var.lambda_sg_name
-# }
-
 # ---------------------
 # ---- API Gateway ----
 # ---------------------
 
-# # Create an IAM role for API Gateway to execute your Lambda function
-# resource "aws_iam_role" "api_gateway_execution_role" {
-#   name = "api_gateway_execution_role"
-
-#   assume_role_policy = <<EOF
-# {
-#   "Version": "2012-10-17",
-#   "Statement": [
-#     {
-#       "Action": "sts:AssumeRole",
-#       "Effect": "Allow",
-#       "Principal": {
-#         "Service": "apigateway.amazonaws.com"
-#       }
-#     }
-#   ]
-# }
-# EOF
-# }
-# # Create an IAM role for API Gateway to invoke the Lambda function
-# resource "aws_iam_role" "api_gateway_invoke_role" {
-#   name = "api_gateway_invoke_role"
-
-#   assume_role_policy = <<EOF
-# {
-#   "Version": "2012-10-17",
-#   "Statement": [
-#     {
-#       "Effect": "Allow",
-#       "Principal": {
-#         "Service": "apigateway.amazonaws.com"
-#       },
-#       "Action": "sts:AssumeRole"
-#     }
-#   ]
-# }
-# EOF
-# }
-
-# # Attach an IAM policy to the role allowing API Gateway to invoke Lambda functions
-# resource "aws_iam_role_policy" "api_gateway_invoke_policy" {
-#   name   = "api_gateway_invoke_policy"
-#   role   = aws_iam_role.api_gateway_invoke_role.id
-
-#   policy = <<EOF
-# {
-#   "Version": "2012-10-17",
-#   "Statement": [
-#     {
-#       "Effect": "Allow",
-#       "Action": "lambda:InvokeFunction",
-#       "Resource": "${aws_lambda_function.dish_api_lambda.arn}"
-#     }
-#   ]
-# }
-# EOF
-# }
-
-# # Attach the AWSLambdaRole policy to the IAM role
-# resource "aws_iam_role_policy_attachment" "api_gateway_execution_role_policy" {
-#   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaRole"
-#   role       = aws_iam_role.api_gateway_execution_role.name
-# }
-
-# resource "aws_lambda_permission" "api_gateway_lambda_permissions" {
-#   statement_id  = "AllowExecutionFromAPIGateway"
-#   action        = "lambda:InvokeFunction"
-#   function_name = aws_lambda_function.dish_api_lambda.function_name
-#   principal     = "apigateway.amazonaws.com"
-
-#   source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*/{proxy+}"
-# }
 
 # Create an IAM role for API Gateway to execute and invoke the Lambda function
 resource "aws_iam_role" "api_gateway_role" {
@@ -896,7 +801,6 @@ resource "aws_lambda_permission" "lambda_api_gw_permission" {
   principal     = "apigateway.amazonaws.com"
   # source_arn = "${aws_api_gateway_rest_api.dish_rest_api.execution_arn}/*/*/*"
   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
-  # source_arn = "arn:aws:execute-api:${var.region}:${var.account_number}:${aws_api_gateway_rest_api.dish_rest_api.id}/*/${aws_api_gateway_method.dish_api_any_method.http_method}${aws_api_gateway_resource.dish_resource.path}"
   source_arn = "arn:aws:execute-api:${var.region}:${var.account_number}:${aws_api_gateway_rest_api.dish_rest_api.id}/*/*/*"
   # source_arn = "arn:aws:execute-api:${var.region}:${var.account_number}:${aws_api_gateway_rest_api.dish_rest_api.id}/*/${aws_api_gateway_method.dish_api_any_method.http_method}${aws_api_gateway_resource.dish_resource.path}"
 
