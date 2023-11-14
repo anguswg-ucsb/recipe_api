@@ -36,8 +36,7 @@ def _query_directions_by_dish_id(conn, cursor, dish_id, limit):
                     SELECT dish_id, dish, directions
                     FROM directions_table
                     WHERE dish_id = ANY(%s)
-                    LIMIT {}
-                    """).format(sql.Literal(limit))
+                    """)
 
 
     # Execute the query with the specified ingredient
