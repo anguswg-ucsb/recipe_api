@@ -122,7 +122,7 @@ def _query_dishes_by_ingredients(conn, cursor, ingredients, limit):
         limit (int): Maximum number of results to return.
         
     Returns:
-        dict: A dictionary of dishes and their ingredients.
+        list: a list of dictionaries with dish name and ingredients ({"dish": "dish name string", "ingredients" : ["ingred1", "ingred2"]})
     """
 
     print(f"Getting ANY dishes with ingredients(s): {ingredients}")
@@ -162,8 +162,12 @@ def _query_dishes_by_ingredients(conn, cursor, ingredients, limit):
     db_rows = cursor.fetchall() 
     print(f"Number of returned rows: {len(db_rows)}")
     
-    # Convert the returned dishes to a key-value pair (dish: ingredients)
-    dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
+
+    # Convert the returned dishes to a list of dictionary key-value pairs [{"dish": "dish name string", "ingredients" : ["ingred1", "ingred2"]}]
+    dishes = [{"dish": db_rows[i][0], "ingredients": db_rows[i][1]["ingredients"]} for i in range(0, len(db_rows))]
+
+    # Convert the returned dishes to a key-value pair (dish: ingredients) (OLD WAY OF DOING IT)
+    # dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
 
     return dishes
 
