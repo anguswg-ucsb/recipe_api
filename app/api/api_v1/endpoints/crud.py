@@ -13,7 +13,7 @@ def _query_directions_by_dish_id(conn, cursor, dish_id, limit):
         limit (int): Maximum number of results to return.
         
     Returns:
-        dict: A dictionary of dish_id and the dish directions (dish_id: directions)
+        list: A list of dictionary key-value pairs [{"dish_id": "dish id string", "directions" : ["direction1", "direction2"]}]
     """
     
     print(f"Getting ANY directions with dish ID: {dish_id}")
@@ -49,8 +49,8 @@ def _query_directions_by_dish_id(conn, cursor, dish_id, limit):
     db_rows = cursor.fetchall() 
     print(f"Number of returned rows: {len(db_rows)}")
 
-    # Convert the returned directions to a key-value pair (dish_id: directions)
-    directions = {db_rows[i][1]: db_rows[i][2]["directions"] for i in range(0, len(db_rows))}
+    # Convert the returned directions to a list of dictionary key-value pairs [{"dish_id": "dish id string", "directions" : ["direction1", "direction2"]}]
+    directions = [{"dish_id": db_rows[i][1], "directions": db_rows[i][2]["directions"]} for i in range(0, len(db_rows))]
 
     return directions
 
@@ -68,7 +68,7 @@ def _query_dishes_by_dish_id(conn, cursor, dish_id, limit):
         limit (int): Maximum number of results to return.
         
     Returns:
-        dict: A dictionary of dish_id and the dishes name (dish_id: dish)
+        list: A list of dictionary key-value pairs [{"dish_id": "dish id string", "dish" : "dish name string"}]
     """
     
     print(f"Getting ANY dishes with dish ID: {dish_id}")
@@ -103,8 +103,8 @@ def _query_dishes_by_dish_id(conn, cursor, dish_id, limit):
     db_rows = cursor.fetchall() 
     print(f"Number of returned rows: {len(db_rows)}")
 
-    # Convert the returned dishes to a key-value pair (dish_id: dish)
-    dishes = {db_rows[i][1]: db_rows[i][0] for i in range(0, len(db_rows))}
+    # Convert the returned dishes to a list of dictionary key-value pairs [{"dish_id": "dish id string", "dish" : "dish name string"}]
+    dishes = [{"dish_id": db_rows[i][1], "dish": db_rows[i][0]["dish"]} for i in range(0, len(db_rows))]
 
     return dishes
 
@@ -122,7 +122,7 @@ def _query_dishes_by_ingredients(conn, cursor, ingredients, limit):
         limit (int): Maximum number of results to return.
         
     Returns:
-        list: a list of dictionaries with dish name and ingredients ({"dish": "dish name string", "ingredients" : ["ingred1", "ingred2"]})
+        list: A list of dictionary key-value pairs [{"dish": "dish name string", "ingredients" : ["ingred1", "ingred2"]}]
     """
 
     print(f"Getting ANY dishes with ingredients(s): {ingredients}")
@@ -166,65 +166,63 @@ def _query_dishes_by_ingredients(conn, cursor, ingredients, limit):
     # Convert the returned dishes to a list of dictionary key-value pairs [{"dish": "dish name string", "ingredients" : ["ingred1", "ingred2"]}]
     dishes = [{"dish": db_rows[i][0], "ingredients": db_rows[i][1]["ingredients"]} for i in range(0, len(db_rows))]
 
-    # Convert the returned dishes to a key-value pair (dish: ingredients) (OLD WAY OF DOING IT)
-    # dishes = {db_rows[i][0]: db_rows[i][1] for i in range(0, len(db_rows))}
-
     return dishes
 
 
 
 # TODO: function needs to be completed
-def _query_ingredients_by_dishes(conn, cursor, dishes, limit):
+# def _query_ingredients_by_dishes(conn, cursor, dishes, limit):
 
-    """
-    SQL query to get ingredients that correspond to the specified dish name(s).
+#     """
+#     SQL query to get ingredients that correspond to the specified dish name(s).
 
-    Args:
-        conn (psycopg2.connection): Connection to the database.
-        cursor (psycopg2.cursor): Cursor object to interact with the database.
-        dishes (str or list): dishes to search for.
-        limit (int): Maximum number of results to return.
+#     Args:
+#         conn (psycopg2.connection): Connection to the database.
+#         cursor (psycopg2.cursor): Cursor object to interact with the database.
+#         dishes (str or list): dishes to search for.
+#         limit (int): Maximum number of results to return.
         
-    Returns:
-        dict: A dictionary of dishes and their ingredients.
-    """
+#     Returns:
+#         dict: A dictionary of dishes and their ingredients.
+#     """
 
-    print(f"Getting ANY ingredients with dish name(s): {dishes}")
+#     print(f"Getting ANY ingredients with dish name(s): {dishes}")
 
-    # Limit the highest number of results to return
-    if limit and limit > 100:
-        limit = 100
+#     # Limit the highest number of results to return
+#     if limit and limit > 100:
+#         limit = 100
 
-    # If a limit was specified, use it, otherwise return all results
-    if limit:
-        query = sql.SQL("""
-                    # TODO: SELECT dish, dish_id
-                    # TODO: FROM dish_table
-                    # TODO: WHERE dish_id = ANY(%s)
-                    LIMIT {}
-                    """).format(sql.Literal(limit))
+#     # If a limit was specified, use it, otherwise return all results
+#     if limit:
+#         query = sql.SQL("""
+#                     # TODO: SELECT dish, dish_id
+#                     # TODO: FROM dish_table
+#                     # TODO: WHERE dish_id = ANY(%s)
+#                     LIMIT {}
+#                     """).format(sql.Literal(limit))
         
-    else:
-        query = sql.SQL("""
-                    # TODO: SELECT dish, dish_id
-                    # TODO: FROM dish_table
-                    # TODO: WHERE dish_id = ANY(%s)
-                    """)
+#     else:
+#         query = sql.SQL("""
+#                     # TODO: SELECT dish, dish_id
+#                     # TODO: FROM dish_table
+#                     # TODO: WHERE dish_id = ANY(%s)
+#                     """)
 
-    # Execute the query with the specified dish_id
-    cursor.execute(query, (dishes, ))
+#     # Execute the query with the specified dish_id
+#     cursor.execute(query, (dishes, ))
 
-    # Commit changes to the database
-    conn.commit()
+#     # Commit changes to the database
+#     conn.commit()
 
-    # Fetch all the rows that match the query
-    db_rows = cursor.fetchall() 
-    print(f"Number of returned rows: {len(db_rows)}")
+#     # Fetch all the rows that match the query
+#     db_rows = cursor.fetchall() 
+#     print(f"Number of returned rows: {len(db_rows)}")
 
-    # Convert the returned dishes to a key-value pair (dish_id: dish)
-    ingredients = {db_rows[i][1]: db_rows[i][0] for i in range(0, len(db_rows))}
+#     # TODO: return statement
+#     # Convert the returned dishes to a key-value pair (dish_id: dish)
+#     ingredients = {db_rows[i][1]: db_rows[i][0] for i in range(0, len(db_rows))}
 
-    return ingredients
+#     return ingredients
 
 
 
