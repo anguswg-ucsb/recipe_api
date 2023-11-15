@@ -45,6 +45,16 @@ sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER = postgres ENCODING =
 
 # s3://${S3_BUCKET}/${S3_FILE}
 
+# CREATE MAIN RECIPE TABLE IN DATABASE
+sudo -u postgres psql ${DB_NAME} -c "
+    CREATE TABLE recipe_table (
+        dish_id SERIAL PRIMARY KEY,
+        dish TEXT,
+        ingredients JSONB,
+        quantities JSONB,
+        directions JSONB
+    );"
+
 # CREATE TABLE IN DATABASE
 sudo -u postgres psql ${DB_NAME} -c "
     CREATE TABLE dish_table (
@@ -74,6 +84,9 @@ sudo -u postgres psql ${DB_NAME} -c "
 #         quantities JSONB,
 #         directions JSONB
 #     );"
+
+# copy dish recipes CSV into recipe_table
+sudo -u postgres psql -d ${DB_NAME} -c "\copy recipe_table FROM 'usr/local/s3_downloads/${S3_FILE}' DELIMITER ',' CSV HEADER;"
 
 # copy dish recipes CSV into dish_table
 sudo -u postgres psql -d ${DB_NAME} -c "\copy dish_table FROM 'usr/local/s3_downloads/${S3_FILE}' DELIMITER ',' CSV HEADER;"
