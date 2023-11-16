@@ -169,60 +169,123 @@ def _query_dishes_by_ingredients(conn, cursor, ingredients, limit):
     return dishes
 
 
+def _query_recipes_by_ingredients(conn, cursor, ingredients, limit):
+
+    """
+    SQL query to get recipes that contain the specified ingredients.
+
+    Args:
+        conn (psycopg2.connection): Connection to the database.
+        cursor (psycopg2.cursor): Cursor object to interact with the database.
+        ingredients (str or list): Ingredients to search for.
+        limit (int): Maximum number of results to return.
+        
+    Returns:
+        list: A list of dictionary key-value pairs [{"dish_id": int,  "dish": str, "ingredients" : List[str], "quantities" : List[str], "directions" : List[str]}]
+    """
+
+    print(f"Getting ANY dishes with ingredients(s): {ingredients}")
+
+    # JSON encode the ingredients list
+    ingredients = json.dumps(ingredients)
+    
+    # Limit the highest number of results to return
+    if limit and limit > 100:
+        limit = 100
+
+
+    # If a limit was specified, use it, otherwise return all results
+    if limit:
+        query = sql.SQL("""
+                    SELECT dish_id, dish, ingredients, quantities, directions
+                    FROM recipe_table
+                    WHERE ingredients -> 'ingredients' @> %s
+                    LIMIT {}
+                    """).format(sql.Literal(limit))
+        
+    else:
+        query = sql.SQL("""
+                    SELECT dish_id, dish, ingredients, quantities, directions
+                    FROM recipe_table
+                    WHERE ingredients -> 'ingredients' @> %s
+                    """)
+
+
+    # Execute the query with the specified ingredient
+    cursor.execute(query, (ingredients, ))
+
+    # Commit changes to the database
+    conn.commit()
+
+    # Fetch all the rows that match the query
+    db_rows = cursor.fetchall() 
+    print(f"Number of returned rows: {len(db_rows)}")
+    
+    # Convert the returned dishes to a list of dictionary key-value pairs [{"dish": "dish name string", "ingredients" : ["ingred1", "ingred2"]}]
+    recipes = [{
+        "dish_id": db_rows[i][0], 
+        "dish": db_rows[i][1], 
+        "ingredients": db_rows[i][2]["ingredients"],
+        "quantities": db_rows[i][3]["quantities"],
+        "directions": db_rows[i][4]["directions"]
+        } for i in range(0, len(db_rows))
+        ]
+
+    return recipes
 
 # TODO: function needs to be completed
-# def _query_ingredients_by_dishes(conn, cursor, dishes, limit):
+def _query_ingredients_by_dishes(conn, cursor, dishes, limit):
 
-#     """
-#     SQL query to get ingredients that correspond to the specified dish name(s).
+    """
+    SQL query to get ingredients that correspond to the specified dish name(s).
 
-#     Args:
-#         conn (psycopg2.connection): Connection to the database.
-#         cursor (psycopg2.cursor): Cursor object to interact with the database.
-#         dishes (str or list): dishes to search for.
-#         limit (int): Maximum number of results to return.
+    Args:
+        conn (psycopg2.connection): Connection to the database.
+        cursor (psycopg2.cursor): Cursor object to interact with the database.
+        dishes (str or list): dishes to search for.
+        limit (int): Maximum number of results to return.
         
-#     Returns:
-#         dict: A dictionary of dishes and their ingredients.
-#     """
+    Returns:
+        dict: A dictionary of dishes and their ingredients.
+    """
 
-#     print(f"Getting ANY ingredients with dish name(s): {dishes}")
+    print(f"Getting ANY ingredients with dish name(s): {dishes}")
 
-#     # Limit the highest number of results to return
-#     if limit and limit > 100:
-#         limit = 100
+    # Limit the highest number of results to return
+    if limit and limit > 100:
+        limit = 100
 
-#     # If a limit was specified, use it, otherwise return all results
-#     if limit:
-#         query = sql.SQL("""
-#                     # TODO: SELECT dish, dish_id
-#                     # TODO: FROM dish_table
-#                     # TODO: WHERE dish_id = ANY(%s)
-#                     LIMIT {}
-#                     """).format(sql.Literal(limit))
+    # If a limit was specified, use it, otherwise return all results
+    if limit:
+        query = sql.SQL("""
+                    # TODO: SELECT dish, dish_id
+                    # TODO: FROM dish_table
+                    # TODO: WHERE dish_id = ANY(%s)
+                    LIMIT {}
+                    """).format(sql.Literal(limit))
         
-#     else:
-#         query = sql.SQL("""
-#                     # TODO: SELECT dish, dish_id
-#                     # TODO: FROM dish_table
-#                     # TODO: WHERE dish_id = ANY(%s)
-#                     """)
+    else:
+        query = sql.SQL("""
+                    # TODO: SELECT dish, dish_id
+                    # TODO: FROM dish_table
+                    # TODO: WHERE dish_id = ANY(%s)
+                    """)
 
-#     # Execute the query with the specified dish_id
-#     cursor.execute(query, (dishes, ))
+    # Execute the query with the specified dish_id
+    cursor.execute(query, (dishes, ))
 
-#     # Commit changes to the database
-#     conn.commit()
+    # Commit changes to the database
+    conn.commit()
 
-#     # Fetch all the rows that match the query
-#     db_rows = cursor.fetchall() 
-#     print(f"Number of returned rows: {len(db_rows)}")
+    # Fetch all the rows that match the query
+    db_rows = cursor.fetchall() 
+    print(f"Number of returned rows: {len(db_rows)}")
 
-#     # TODO: return statement
-#     # Convert the returned dishes to a key-value pair (dish_id: dish)
-#     ingredients = {db_rows[i][1]: db_rows[i][0] for i in range(0, len(db_rows))}
+    # TODO: return statement
+    # Convert the returned dishes to a key-value pair (dish_id: dish)
+    ingredients = {db_rows[i][1]: db_rows[i][0] for i in range(0, len(db_rows))}
 
-#     return ingredients
+    return ingredients
 
 
 

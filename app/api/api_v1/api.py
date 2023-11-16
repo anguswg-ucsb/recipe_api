@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from .endpoints import get_directions_by_dish_id, get_dishes_by_dish_id, get_dishes_by_ingredients, get_ingredients_by_dishes, get_suggested_ingredients
+from .endpoints import get_directions_by_dish_id, get_dishes_by_dish_id, get_dishes_by_ingredients, get_recipes_by_ingredients, get_ingredients_by_dishes, get_suggested_ingredients
 
 router = APIRouter()
 
@@ -12,6 +12,9 @@ router.include_router(get_dishes_by_dish_id.router, prefix="/dishes-by-dish_id",
 
 # Get dishes by ingredients route
 router.include_router(get_dishes_by_ingredients.router, prefix="/dishes-by-ingredients", tags=["DishesByIngredients"])
+
+# Get recipes by ingredients route
+router.include_router(get_recipes_by_ingredients.router, prefix="/recipes-by-ingredients", tags=["RecipesByIngredients"])
 
 # Get ingredients by dishes route
 router.include_router(get_ingredients_by_dishes.router, prefix="/ingredients-by-dishes", tags=["IngredientsByDishes"])
