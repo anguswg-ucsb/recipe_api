@@ -21,8 +21,8 @@ locals {
   # csv_file_path = "/Users/anguswatters/Desktop/recipes_data/dish_recipes2.csv"
   # unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes_data/unique_ingredients.csv"
 
-  csv_file_path = "/Users/anguswatters/Desktop/recipes/data/output/dish_recipes2.csv"
-  unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes/data/output/unique_ingredients.csv"
+  csv_file_path = "/Users/anguswatters/Desktop/recipes_out/output/dish_recipes2.csv"
+  unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes_out/output/unique_ingredients.csv"
   api_lambda_zip = "../deploy/lambda_function.zip"
 }
 
