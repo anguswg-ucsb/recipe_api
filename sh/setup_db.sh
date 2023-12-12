@@ -52,7 +52,10 @@ sudo -u postgres psql ${DB_NAME} -c "
         dish TEXT,
         ingredients JSONB,
         quantities JSONB,
-        directions JSONB
+        directions JSONB,
+        url TEXT,
+        base_url TEXT,
+        img TEXT
     );"
 
 # CREATE TABLE IN DATABASE
@@ -62,7 +65,10 @@ sudo -u postgres psql ${DB_NAME} -c "
         dish TEXT,
         ingredients JSONB,
         quantities JSONB,
-        directions JSONB
+        directions JSONB,
+        url TEXT,
+        base_url TEXT,
+        img TEXT
     );"
 
 # CREATE TABLE IN DATABASE
@@ -141,7 +147,15 @@ sudo -u postgres psql ${DB_NAME} -c "INSERT INTO quantities_table (dish_id, dish
 # Drop split_ingredients, quantities, directions from main dish_table
 sudo -u postgres psql ${DB_NAME} -c "ALTER TABLE dish_table
     DROP COLUMN IF EXISTS quantities,
-    DROP COLUMN IF EXISTS directions;"
+    DROP COLUMN IF EXISTS directions,
+    DROP COLUMN IF EXISTS url,
+    DROP COLUMN IF EXISTS base_url,
+    DROP COLUMN IF EXISTS img;"
+
+# # Drop split_ingredients, quantities, directions from main dish_table
+# sudo -u postgres psql ${DB_NAME} -c "ALTER TABLE dish_table
+#     DROP COLUMN IF EXISTS quantities,
+#     DROP COLUMN IF EXISTS directions;"
 
 # remove CSV file downloaded from S3
 sudo rm /usr/local/s3_downloads/${S3_FILE}

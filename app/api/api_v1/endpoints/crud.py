@@ -197,7 +197,7 @@ def _query_recipes_by_ingredients(conn, cursor, ingredients, limit):
     # If a limit was specified, use it, otherwise return all results
     if limit:
         query = sql.SQL("""
-                    SELECT dish_id, dish, ingredients, quantities, directions
+                    SELECT dish_id, dish, ingredients, quantities, directions, url, base_url, img
                     FROM recipe_table
                     WHERE ingredients -> 'ingredients' @> %s
                     LIMIT {}
@@ -205,7 +205,7 @@ def _query_recipes_by_ingredients(conn, cursor, ingredients, limit):
         
     else:
         query = sql.SQL("""
-                    SELECT dish_id, dish, ingredients, quantities, directions
+                    SELECT dish_id, dish, ingredients, quantities, directions, url, base_url, img
                     FROM recipe_table
                     WHERE ingredients -> 'ingredients' @> %s
                     """)
@@ -220,14 +220,18 @@ def _query_recipes_by_ingredients(conn, cursor, ingredients, limit):
     # Fetch all the rows that match the query
     db_rows = cursor.fetchall() 
     print(f"Number of returned rows: {len(db_rows)}")
-    
+    print(f"db_rows: {db_rows}")
+
     # Convert the returned dishes to a list of dictionary key-value pairs [{"dish": "dish name string", "ingredients" : ["ingred1", "ingred2"]}]
     recipes = [{
         "dish_id": db_rows[i][0], 
         "dish": db_rows[i][1], 
         "ingredients": db_rows[i][2]["ingredients"],
         "quantities": db_rows[i][3]["quantities"],
-        "directions": db_rows[i][4]["directions"]
+        "directions": db_rows[i][4]["directions"],
+        "url": db_rows[i][5],
+        "base_url": db_rows[i][6],
+        "img": db_rows[i][7]
         } for i in range(0, len(db_rows))
         ]
 

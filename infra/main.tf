@@ -24,6 +24,7 @@ locals {
   csv_file_path = "/Users/anguswatters/Desktop/recipes_out/output/dish_recipes2.csv"
   unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes_out/output/unique_ingredients.csv"
   api_lambda_zip = "../deploy/lambda_function.zip"
+  name_tag = "recipes-app"
 }
 
 ####################
@@ -411,6 +412,10 @@ resource "aws_s3_bucket_logging" "dish_recipes_logging" {
 # s3 bucket for lambda code
 resource "aws_s3_bucket" "dish_api_lambda_bucket" {
   bucket = var.dish_api_bucket_name
+  tags = {
+    name = local.name_tag
+    resource_category = "s3"
+  }
 }
 
 # s3 object for lambda code
@@ -418,6 +423,11 @@ resource "aws_s3_object" "dish_api_lambda_code" {
   bucket = aws_s3_bucket.dish_api_lambda_bucket.bucket
   key    = "lambda_function.zip"
   source = local.api_lambda_zip
+  source_hash = filemd5(local.api_lambda_zip)
+  tags = {
+    name = local.name_tag
+    resource_category = "s3"
+  }
 }
 
 ##################################
