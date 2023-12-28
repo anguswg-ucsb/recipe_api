@@ -29,3 +29,4 @@ app.include_router(api_router, prefix="/api/v1")
 
 # wrap app in mangum for running API within Lambda
 handler = Mangum(app)
+
