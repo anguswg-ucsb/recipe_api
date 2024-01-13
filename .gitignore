@@ -215,3 +215,48 @@ deploy/lambda_function.zip
 
 .DS_Store
 **/.DS_Store
+
+
+# Ignore all .tf files
+*.tf
+*.tfvars
+
+# Except for main.tf
+!main.tf
+!s3.tf
+!sqs.tf
+!dynamodb.tf
+!s3_events.tf
+!sqs.tf
+!iam.tf
+!lambda.tf
+!ecr.tf
+!cloudwatch.tf
+!sg.tf
+!vpc.tf
+!ec2.tf
+!apigateway.tf
+!secrets_manager.tf
+
+variables.tf
+
+.DS_Store
+**/.DS_Store
+
+# terraform folder ignore
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+infra/terraform.tfvars
+infra/.terraform.lock.hcl
+infra/.terraform/
+infra/tfplan
+infra/variables.tf
+
+lambda_containers/model/
+lambda_containers/model/*
+lambda_containers/model/.DS_Store
+lambda_containers/model/**/.DS_Store
+
+deploy/
+deploy/*
+scrap.py

@@ -8,6 +8,15 @@ TARGET_DIR="$BASE_DIR/package"
 ZIP_NAME="lambda_function.zip"
 APP_DIR="app"
 
+# # Install Python packages
+# pip install \
+#   --platform manylinux2014_x86_64 \
+#   --target "$TARGET_DIR" \
+#   --implementation cp \
+#   --python-version 3.11 \
+#   --only-binary=:all: --upgrade \
+#   fastapi==0.99.1 psycopg2-binary mangum uvicorn python-dotenv
+
 # Install Python packages
 pip install \
   --platform manylinux2014_x86_64 \
@@ -15,7 +24,7 @@ pip install \
   --implementation cp \
   --python-version 3.11 \
   --only-binary=:all: --upgrade \
-  fastapi==0.99.1 psycopg2-binary mangum uvicorn python-dotenv
+  -r "$BASE_DIR/$APP_DIR/requirements.txt"
 
 echo "Installed packages to: $TARGET_DIR"
 
