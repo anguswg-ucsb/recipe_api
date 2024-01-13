@@ -619,7 +619,7 @@ def extract_ingredients_lambda(event, context):
 #         "s3SchemaVersion": "1.0",
 #         "configurationId": "828aa6fc-f7b5-4305-8584-487c791949c1",
 #         "bucket": {
-#           "name": "test-staging-bucket-mros",
+            "name": "XXX-staging-bucket",   
 #           "ownerIdentity": {
 #             "principalId": "A3I5XTEXAMAI3E"
 #           },
@@ -657,7 +657,7 @@ def extract_ingredients_lambda(event, context):
 #         "s3SchemaVersion": "1.0",
 #         "configurationId": "828aa6fc-f7b5-4305-8584-487c791949c1",
 #         "bucket": {
-#           "name": "test-staging-bucket-mros",
+#           "name": "XXX-staging-bucket",
 #           "ownerIdentity": {
 #             "principalId": "A3I5XTEXAMAI3E"
 #           },
@@ -694,7 +694,7 @@ def extract_ingredients_lambda(event, context):
 #         "s3SchemaVersion": "1.0",
 #         "configurationId": "828aa6fc-f7b5-4305-8584-487c791949c1",
 #         "bucket": {
-#           "name": "test-staging-bucket-mros",
+#           "name": "XXXX-bucket",
 #           "ownerIdentity": {
 #             "principalId": "A3I5XTEXAMAI3E"
 #           },
