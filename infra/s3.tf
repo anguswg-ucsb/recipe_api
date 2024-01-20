@@ -320,6 +320,103 @@ resource "aws_s3_bucket_policy" "output_bucket_policy" {
   ]
 }
 
+# #######################################
+# # AWS S3 bucket (SQS consumer script) #
+# #######################################
+
+# s3 bucket for raw data
+resource "aws_s3_bucket" "script_bucket" {
+  bucket = var.recipe_script_bucket_name
+}
+
+# S3 object for SQS consumer python script that runs on EC2 instance
+resource "aws_s3_object" "script_bucket_object" {
+  bucket = aws_s3_bucket.script_bucket.id
+  key    = var.recipe_script_filename
+  source = local.recipe_script_path
+  etag   = filemd5(local.recipe_script_path)
+}
+
+#################################
+# S3 bucket permissions (STAGE) #
+#################################
+
+# Enable object versioning on STAGE S3 bucket
+resource "aws_s3_bucket_versioning" "script_s3_bucket_versioning" {
+  bucket = aws_s3_bucket.script_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# s3 bucket ownership controls
+resource "aws_s3_bucket_ownership_controls" "script_s3_bucket_ownership_controls" {
+  bucket = aws_s3_bucket.script_bucket.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+# s3 bucket public access block
+resource "aws_s3_bucket_public_access_block" "script_s3_public_access_block" {
+  bucket = aws_s3_bucket.script_bucket.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_acl" "script_s3_bucket_acl" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.script_s3_bucket_ownership_controls,
+    aws_s3_bucket_public_access_block.script_s3_public_access_block,
+  ]
+
+  bucket = aws_s3_bucket.script_bucket.id
+  acl    = "private"
+}
+
+data "aws_iam_policy_document" "script_s3_bucket_policy_document" {
+  statement {
+    sid = "RecipesStageBucketPolicyFromCurrentAccount"
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:ListBucket"
+    ]
+
+    resources = [
+      aws_s3_bucket.script_bucket.arn,
+      "${aws_s3_bucket.script_bucket.arn}/*"
+    ]
+
+    condition {
+      test = "StringEquals"
+      variable = "aws:PrincipalAccount"
+      values = [var.aws_account_number]
+    }
+  }
+}
+
+# s3 bucket policy to allow public access
+resource "aws_s3_bucket_policy" "script_bucket_policy" {
+  bucket = aws_s3_bucket.script_bucket.id
+  policy = data.aws_iam_policy_document.script_s3_bucket_policy_document.json
+  depends_on = [
+    aws_s3_bucket_acl.script_s3_bucket_acl,
+    aws_s3_bucket_ownership_controls.script_s3_bucket_ownership_controls,
+    aws_s3_bucket_public_access_block.script_s3_public_access_block,
+  ]
+}
+
+
 # # ##########################################
 # # # AWS S3 Object (Upload local CSV files) #
 # # ##########################################
@@ -354,7 +451,7 @@ resource "aws_s3_bucket_policy" "output_bucket_policy" {
 
 # create s3 bucket for storing logs for dish recipes bucket
 resource "aws_s3_bucket" "output_recipes_log_bucket" {
-  bucket = "dish-recipes-log-bucket"
+  bucket = var.output_recipes_log_bucket_name
 }
 
 # s3 bucket ownership controls
@@ -387,7 +484,7 @@ resource "aws_s3_bucket_acl" "output_recipes_log_bucket_acl" {
 }
 
 # add logging bucket policy to log from dish recipes bucket to output_recipes_log_bucket 
-resource "aws_s3_bucket_logging" "dish_recipes_logging" {
+resource "aws_s3_bucket_logging" "output_recipes_logging" {
   bucket = data.aws_s3_bucket.output_s3_bucket.id
   target_bucket = aws_s3_bucket.output_recipes_log_bucket.id
   target_prefix = "log/"

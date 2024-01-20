@@ -52,3 +52,20 @@ resource "aws_s3_bucket_notification" "stage_s3_bucket_notification" {
     filter_suffix = ".csv"
   }
 }
+
+############################################################################################################
+#### S3 notification to send SQS OUTPUT CSVs for EC2 to consume #####
+############################################################################################################
+
+# Create S3 event notification to send messages to SQS queue 
+# when a final OUTPUT.csv file is uploaded to the OUTPUT S3 bucket 
+resource "aws_s3_bucket_notification" "output_s3_bucket_notification" {
+  bucket = data.aws_s3_bucket.output_s3_bucket.id
+
+  queue {
+    queue_arn     = aws_sqs_queue.sqs_output_queue.arn
+    events        = ["s3:ObjectCreated:*"]
+    # filter_suffix = ".json"
+    filter_suffix = ".csv"
+  }
+}

@@ -193,7 +193,7 @@ def sanitize_json(json_obj):
         "yields", "image", "ingredients", "instructions", "ratings",
         "author", "cuisine", "description", 
         # "uid",
-        "url", "ingredient_tags", "sorted_ingredient_tags", # keys that are added and do NOT come from the recipe scraper
+        "url", "ingredient_tags", "sorted_ingredient_tags", "timestamp" # keys that are added and do NOT come from the recipe scraper
         ]
     
     # create a dictionary of the keys and their data types
@@ -216,11 +216,13 @@ def sanitize_json(json_obj):
         "url": str,
         "ingredient_tags": list,
         "sorted_ingredient_tags": list,
+        "timestamp": int,
         }
     
     # iterate over each key and add it with an appropriate empty value if missing
     for key in keys_to_keep:
         # print(f"key: {key}")
+        
         # check if key is in json object
         if key not in json_obj or json_obj[key] is None:
             print(f"==== '{key}' not in json_obj or is None ====")
@@ -232,7 +234,13 @@ def sanitize_json(json_obj):
                 [] if keys_to_type_map[key] == list else
                 ""  # assuming all other cases are strings
             )
+
+            # if key is "timestamp", set to current time
+            if key == "timestamp":
+                default_value = int(time.time())
+            
             json_obj[key] = default_value
+
         else:
             # coerce the value to the expected type if needed
             expected_type = keys_to_type_map[key]
@@ -253,6 +261,11 @@ def sanitize_json(json_obj):
                         [] if expected_type == list else
                         ""  # assuming all other cases are strings
                     )
+
+                    # if key is "timestamp", set to current time
+                    if key == "timestamp":
+                        json_obj[key] = int(time.time())
+
     # Remove keys that are not in keys_to_keep
     json_obj = {key: json_obj[key] for key in keys_to_keep if key in json_obj}
 
@@ -331,8 +344,12 @@ def process_message(message):
     # # Create a new dictionary with the renamed keys
     # updated_scraped_json = {key_mapping.get(old_key, old_key): value for old_key, value in scraped_json.items()}
     print(f"Updating message_body with scraped_json keys...")
+
     # add the scraped data to the original json
     message_body.update(scraped_json)
+
+    # Add a timestamp key to message_body
+    message_body["timestamp"] = int(time.time())
 
     try:
         message_body = sanitize_json(message_body)

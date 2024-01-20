@@ -322,13 +322,19 @@ resource "aws_lambda_event_source_mapping" "extract_ingredients_lambda_event_sou
 
 # lambda function to process csv file
 resource "aws_lambda_function" "recipe_api_lambda" {
+
   s3_bucket        = aws_s3_bucket.recipe_api_lambda_bucket.bucket
   s3_key           = var.recipe_api_lambda_function_zip_file
   s3_object_version = aws_s3_object.recipe_api_lambda_code.version_id
   source_code_hash = var.recipe_api_lambda_function_zip_file
-
-  # s3_key           = "lambda_function.zip"
   function_name    = var.recipe_api_lambda_function_name
+
+  # s3_bucket        = aws_s3_bucket.dish_api_lambda_bucket.bucket
+  # s3_key           = var.dish_api_lambda_function_zip_file
+  # s3_object_version = aws_s3_object.dish_api_lambda_code.version_id
+  # source_code_hash = var.dish_api_lambda_function_zip_file
+  # function_name    = var.dish_api_lambda_function_name
+
   handler          = "app.main.handler"
   # handler          = "function.name/handler.process_csv_lambda"
   role             = aws_iam_role.recipe_api_lambda_role.arn
@@ -368,6 +374,8 @@ resource "aws_lambda_function" "recipe_api_lambda" {
     aws_security_group.lambda_sg,
     aws_s3_bucket.recipe_api_lambda_bucket,
     aws_s3_object.recipe_api_lambda_code,
+    # aws_s3_bucket.dish_api_lambda_bucket,
+    # aws_s3_object.dish_api_lambda_code,
     aws_iam_role_policy_attachment.recipe_api_lambda_logs,
     aws_cloudwatch_log_group.recipe_api_log_group,
   ]

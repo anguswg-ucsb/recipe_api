@@ -260,3 +260,13 @@ lambda_containers/model/**/.DS_Store
 deploy/
 deploy/*
 scrap.py
+
+s3_downloads/
+s3_downloads/*
+
+sqs_consumer/.env
+example.db
+test_database.db
+test_data1.csv
+test_data2.csv
+test_data3.csv

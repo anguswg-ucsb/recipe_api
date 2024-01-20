@@ -25,12 +25,16 @@ locals {
 
   # REST API Lambda zip file
   recipe_api_lambda_zip = "../deploy/app.zip"
+  # dish_api_lambda_zip = "../deploy/app.zip"
   # recipe_api_lambda_zip = "../deploy/lambda_function.zip"
 
   # Data pipeline Lambda zip files
   chunk_csv_lambda_zip = "../deploy/chunk_csv_lambda.zip"
   send_json_lambda_zip = "../deploy/send_json_recipes_lambda.zip"
   recipe_scraper_lambda_zip = "../deploy/recipe_scraper_lambda.zip"
+
+  # SQS consumer python script
+  recipe_script_path = "../sqs_consumer/main.py"
 
   # name tag for resources
   name_tag = "recipe-app"

@@ -207,6 +207,38 @@ resource "aws_iam_role" "ec2_role" {
 EOF
 }
 
+# add policy for EC2 to receive SQS messages
+resource "aws_iam_policy" "ec2_policy" {
+  name = "EC2-SQS-ReceiveMessage"
+
+  policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "Stmt1426528957000",
+        "Effect": "Allow",
+        "Action": [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ],
+        "Resource": [
+          "${aws_sqs_queue.sqs_output_queue.arn}"
+        ]
+      }
+    ]
+}
+EOF
+}
+
+# add policy for EC2 to recieve SQS messages
+resource "aws_iam_role_policy_attachment" "ec2_policy_attachment" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_policy.arn
+}
+
+# add policy for EC2 to read from S3
 resource "aws_iam_role_policy_attachment" "ec2_role_policy_attachment" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"

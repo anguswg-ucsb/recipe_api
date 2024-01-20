@@ -116,3 +116,44 @@ resource "aws_sqs_queue_policy" "sqs_process_staged_queue_policy" {
     ]
   })
 }
+
+
+# ########################################################
+# # SQS Queue for S3 event notifications (OUTPUT BUCKET) #
+# ########################################################
+
+# sqs_process_staged_queue
+# sqs_s3_event_queue_stage
+
+# SQS queue for S3 event notifications
+resource "aws_sqs_queue" "sqs_output_queue" {
+  name                       = var.output_sqs_queue_name
+  delay_seconds              = 10
+  max_message_size           = 2048
+  message_retention_seconds  = 518400 # 6 day retention period
+  receive_wait_time_seconds  = 20
+  visibility_timeout_seconds = 45 
+  # policy = data.aws_iam_policy_document.sqs_queue_policy_doc.json
+
+}
+
+# SQS queue policy to allow lambda to write to queue
+resource "aws_sqs_queue_policy" "sqs_output_queue_policy" {
+  queue_url = aws_sqs_queue.sqs_output_queue.id
+  policy    = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = "*",
+        Action = "sqs:SendMessage",
+        Resource = aws_sqs_queue.sqs_output_queue.arn,
+        Condition = {
+          ArnEquals = {
+            "aws:SourceArn" = data.aws_s3_bucket.output_s3_bucket.arn
+          }
+        }
+      }
+    ]
+  })
+}

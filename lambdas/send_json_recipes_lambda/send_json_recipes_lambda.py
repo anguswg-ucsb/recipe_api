@@ -66,7 +66,7 @@ def process_csv_chunk_message(message):
     # get the object from S3
     s3_obj = s3.get_object(Bucket=S3_BUCKET, Key=S3_FILE_NAME)
 
-    chunk_csv = pd.read_csv(s3_obj['Body'], skiprows=message_body["start_index"], nrows=message_body["nrows"], header = None, names = ["uid", "url"])
+    chunk_csv = pd.read_csv(s3_obj['Body'], skiprows=message_body["start_index"], nrows=message_body["nrows"], header = None, names = ["url"])
     # chunked_list.append(chunk_csv)
 
     # Iterate over rows, convert each row to a dictionary, and save as JSON

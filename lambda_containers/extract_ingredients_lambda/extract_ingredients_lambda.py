@@ -64,7 +64,7 @@ def clean_scraped_data(df):
     cols_to_keep = ["author", "category", "cook_time", "cuisine", 
                            "description", "host", "image", "ingredient_tags", "ingredients", 
                            "instructions", "prep_time", "ratings", 
-                           "sorted_ingredient_tags", "title", "total_time", 
+                           "sorted_ingredient_tags", "timestamp", "title", "total_time", 
                            "url", "yields"]
     
     # drop any columns that are not in the cols_to_keep list
@@ -80,7 +80,7 @@ def clean_scraped_data(df):
     # text_columns = ['title', 'host', 'yields', 'image', 'author', 'description', 'uid', 'url']
 
     # list of columns that will end up as integer columns in postgres database
-    integer_columns = ['total_time', 'cook_time', 'prep_time']
+    integer_columns = ['timestamp', 'total_time', 'cook_time', 'prep_time']
 
     # list of columns that will end up as float columns in postgres database
     float_columns = ['ratings']
@@ -172,7 +172,7 @@ def clean_scraped_data(df):
     # manually select and order columns for final output in alphabetical order
     df = df[['author', 'category', 'cook_time', 'cuisine', 'description', 'host',
             'image', 'ingredient_tags', 'ingredients', 'instructions', 'prep_time',
-            'ratings', 'sorted_ingredient_tags', 'title', 'total_time', 'url',
+            'ratings', 'sorted_ingredient_tags', 'timestamp', 'title', 'total_time', 'url',
             'yields']]
     
     print(f"Fill any NaN with default values...")
@@ -210,7 +210,8 @@ def add_missing_columns(df, missing_columns):
         # "uid": str,
         "url": object,
         "ingredient_tags": object,
-        "sorted_ingredient_tags": object
+        "sorted_ingredient_tags": object,
+        "timestamp": np.int64
         }
     
     # create a dictionary of the keys and their data types
@@ -231,7 +232,8 @@ def add_missing_columns(df, missing_columns):
         "description": "",
         "url": "",
         "ingredient_tags": '{"ingredient_tags": [""]}',
-        "sorted_ingredient_tags": '{"sorted_ingredient_tags": [""]}'
+        "sorted_ingredient_tags": '{"sorted_ingredient_tags": [""]}',
+        "timestamp": 0
         }
 
     # Iterate over missing columns and add them to the DataFrame with appropriate data type
@@ -277,7 +279,8 @@ def fillna_default_vals(df):
         "description": "",
         "url": "",
         "ingredient_tags": '{"ingredient_tags": [""]}',
-        "sorted_ingredient_tags": '{"sorted_ingredient_tags": [""]}'
+        "sorted_ingredient_tags": '{"sorted_ingredient_tags": [""]}',
+        "timestamp": 0
         }
     
     df = df.fillna(value=default_vals_map, inplace=False)
@@ -399,7 +402,7 @@ def sanitize_json(json_obj):
         "host", "title", "category", "total_time", "cook_time", "prep_time",
         "yields", "image", "ingredients", "instructions", "ratings",
         "author", "cuisine", "description", 
-        "uid", "url", "ingredient_tags" # keys that are added and do NOT come from the recipe scraper
+        "uid", "url", "ingredient_tags", "timestamp" # keys that are added and do NOT come from the recipe scraper
         ]
     
     # create a dictionary of the keys and their data types
@@ -420,7 +423,8 @@ def sanitize_json(json_obj):
         "description": str,
         "uid": str,
         "url": str,
-        "ingredient_tags": list
+        "ingredient_tags": list,
+        "timestamp": int
         }
     
     # iterate over each key and add it with an appropriate empty value if missing
@@ -437,6 +441,10 @@ def sanitize_json(json_obj):
                 [] if keys_to_type_map[key] == list else
                 ""  # assuming all other cases are strings
             )
+
+            # if key is "timestamp", set to current time
+            if key == "timestamp":
+                default_value = int(time.time())
 
             json_obj[key] = default_value
         else:
@@ -467,6 +475,10 @@ def sanitize_json(json_obj):
                         [] if expected_type == list else
                         ""  # assuming all other cases are strings
                     )
+                    
+                    # if key is "timestamp", set to current time
+                    if key == "timestamp":
+                        json_obj[key] = int(time.time())
         #         print(f"json_obj[key] after coercion: {json_obj[key]}")
         #         print(f"json_obj[key] type after coercion: {type(json_obj[key])}")
         # print(f"=====" * 5)
@@ -619,7 +631,7 @@ def extract_ingredients_lambda(event, context):
 #         "s3SchemaVersion": "1.0",
 #         "configurationId": "828aa6fc-f7b5-4305-8584-487c791949c1",
 #         "bucket": {
-            "name": "XXX-staging-bucket",   
+#        # "name": "XXX-staging-bucket",
 #           "ownerIdentity": {
 #             "principalId": "A3I5XTEXAMAI3E"
 #           },
