@@ -5,6 +5,8 @@ import subprocess
 import json
 import os
 import time
+import csv
+from collections import defaultdict
 
 # AWS SDK for Python
 import boto3
@@ -31,7 +33,20 @@ if DB_USERNAME:
 
 if DB_PASSWORD:
     print(f"---->\n DB_PASSWORD WAS FOUND")
+# ######
+# tmp = pd.read_csv('/Users/anguswatters/Downloads/9d01169a86e24fb8867823a6fcd249a6_1705762724.csv')
+# tmp = pd.read_csv('/Users/anguswatters/Downloads/5dbe3e1610654706bd4da237da7be2bd_1705762730.csv')
 
+# tmp
+# len(create_unique_ingredients(tmp))
+
+
+# ######
+# --------------------------------
+# ---- Recipes data functions ----
+# functions for upserting new CSV data into database from an SQS queue
+# --------------------------------
+    
 # execute_upsert_script()
 def upsert_recipe_csv_into_db(db_name, csv_path, target_table, staging_table):
     
@@ -131,12 +146,33 @@ def upsert_recipe_csv_into_db(db_name, csv_path, target_table, staging_table):
         if upsert_output.returncode != 0:
             print(f"ERROR: Upsert command failed with return code {upsert_output.returncode}")
             print(f"stderr: {upsert_output.stderr}")
+        else:
+
+            try: 
+                print(f"---" * 5)
+                print(f"------ TRYING TO LOOK AT RECIPES UPDATES COUNTS -------")
+                print(f"---" * 5)
+                # Parse the output to determine inserted and updated rows
+                rows_affected = upsert_output.stdout.strip().split('\n')
+                inserted_rows = [row.split('\t') for row in rows_affected if "INSERT 0 1" in row]
+                updated_rows = [row.split('\t') for row in rows_affected if "UPDATE 1" in row]
+
+                print(f"Inserted Rows: {inserted_rows}")
+                print(f"Updated Rows: {updated_rows}")
+                print(f"---" * 5)
+            except Exception as e:
+                print(f"Exception raised while parsing upsert output:\n{e}")
         print(f"=====" * 8)
     except Exception as e:
         print(f"Exception raised while running psql upsert_command\n{e}")
         print(f"ERROR upsert_command:\n - '{' '.join(upsert_command)}'")
 
-def create_and_upsert_unique_ingredients_data(csv_path):
+# --------------------------------------
+# ---- Unique ingredients functions ----
+# From new recipes CSV file (saved locally) extract all of the unique ingredients and upsert them into the database)
+# --------------------------------------
+        
+def create_and_upsert_unique_ingredients_data(db_name, csv_path):
 
     # csv_path = "/Users/anguswatters/Desktop/s3_downloads/9d01169a86e24fb8867823a6fcd249a6_1705762724.csv"
     
@@ -150,18 +186,35 @@ def create_and_upsert_unique_ingredients_data(csv_path):
     output_filename = filename.replace(".csv", "_unique_ingredients.csv")
     output_path = os.path.join(dir_path, output_filename)
 
+    print(f"CREATING UNIQUE INGREDIENTS...")
+
     # read in CSV into pandas dataframe
     df = pd.read_csv(csv_path)
 
+    print(f"--> Calculating unique ingredients in memory...")
+
     # create unique ingredients dataframe
     unique_ingreds = create_unique_ingredients(df)
+    
+    print(f"--> Number of unique ingredients: {len(unique_ingreds)}")
+    print(f"--> Saving unique ingredients CSV file to '{output_path}'...")
 
     # save unique ingredients dataframe to csv
     unique_ingreds[["ingredient", "count"]].to_csv(output_path, index=False)
 
+    print(f"--> UPSERTING unique ingredients into database...")
+    
     # upsert unique ingredients into database
-    upsert_unique_ingredients_into_db(DB_NAME, output_path, "unique_ingredients_table", "staging_unique_ingredients_table")
+    upsert_unique_ingredients_into_db(db_name, output_path, "unique_ingredients_table", "staging_unique_ingredients_table")
 
+    print(f"--> Deleting local file {output_path}...")
+    
+    # Delete the local file
+    subprocess.run(f"rm {output_path}", shell=True)
+
+    print(f"----" * 5)
+    print(f"UPSERT of unique ingredients ATTEMPT COMPLETE!")
+    print(f"----" * 5)
 
 # From a local CSV file, extract the count of unique ingredients in the CSV and upsert new rows into a database table
 def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_table):
@@ -206,8 +259,8 @@ def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_t
         SELECT {insert_cols} 
         FROM {staging_table} 
         ON CONFLICT (ingredient) 
-        DO UPDATE SET 
-            {update_cols}
+        DO UPDATE SET
+            count = {target_table}.count + EXCLUDED.count  -- Increment count if ingredient exists
         RETURNING *;
         DROP TABLE {staging_table};
     COMMIT;
@@ -229,6 +282,22 @@ def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_t
         if upsert_output.returncode != 0:
             print(f"ERROR: Upsert command failed with return code {upsert_output.returncode}")
             print(f"stderr: {upsert_output.stderr}")
+        else:
+            try: 
+                print(f"---" * 5)
+                print(f"------ TRYING TO LOOK AT UPDATING COUNTS -------")
+                print(f"---" * 5)
+                # Parse the output to determine inserted and updated rows
+                rows_affected = upsert_output.stdout.strip().split('\n')
+                inserted_rows = [row.split('\t') for row in rows_affected if "INSERT 0 1" in row]
+                updated_rows = [row.split('\t') for row in rows_affected if "UPDATE 1" in row]
+
+                print(f"Inserted Rows: {inserted_rows}")
+                print(f"Updated Rows: {updated_rows}")
+                print(f"---" * 5)
+            except Exception as e:
+                print(f"Exception raised while parsing upsert output:\n{e}")
+
         print(f"=====" * 8)
     except Exception as e:
         print(f"Exception raised while running psql upsert_command\n{e}")
@@ -236,7 +305,8 @@ def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_t
 
 #################################################################        
 #################################################################
-        
+
+
 def create_unique_ingredients(df, json_column = "ingredient_tags"):
     """Create unique ingredients dataset
 
@@ -246,67 +316,78 @@ def create_unique_ingredients(df, json_column = "ingredient_tags"):
     Returns:
         pandas.DataFrame: Unique ingredients dataset
     """
-
-    # df = recipes2.head(5)
-
-    # # convert json dictionary column to dictionary and then list
-    # df['ingredients'].apply(json.loads)
-
     # #########################
     # df = recipe_df
     # json_column = "ingredient_tags"
+
+    # Example ingredient_tags column value:
+    '{"ingredient_tags": ["cream", "lingonberry sauce", "fruit preserves", "egg whites", "salt", "sugar", "flour", "egg yolks", "vanilla extract", "sugar"]}'
     # #########################
+
+    print(f"Generating unique ingredients from '{json_column}' column...")
 
     # Select just ingredients column
     df = df[[json_column]]
 
+    print(f"Converting '{json_column}' column to dictionary...")
     # convert json dictionary column to dictionary and then list
     df[json_column] = df[json_column].apply(lambda row: json.loads(row)[json_column])
     # df["ingredients"] = df["ingredients"].apply(lambda row: json.loads(row)['ingredients'])
 
+    print(f"Exploding '{json_column}' column...")
     # explode "ingredients" list column to make an individual row for each ingredients in each dish
     df = df.explode([json_column]).reset_index(drop=True)
     # df = df.explode(['ingredients']).reset_index(drop=True)
 
+    print(f"Removing extra whitespaces...")
     # replace whitespace with single space
     df[json_column] = df[json_column].replace(r'\s+', ' ', regex=True)
     # df["ingredients"] = df["ingredients"].replace(r'\s+', ' ', regex=True)
 
+    print(f"Setting all characters to lowercase...")
     # convert all characters in 'ingredients' to lowercase
     df[json_column] = df[json_column].str.lower()
     # df['ingredients'] = df['ingredients'].str.lower()
 
+    print(f"Counting unique ingredients...")
     # CREATE FREQUENCY DATAFRAME
     # ingreds_df = df[["ingredients"]]
     freq_df = df[[json_column]].value_counts()
     # freq_df = df[["ingredients"]].value_counts()
 
+    print(f"Making 'freq_df'")
     # convert series to dataframe
     freq_df = pd.DataFrame(freq_df)
 
     # reset index
     freq_df = freq_df.reset_index()
 
+    print(f"Dropping duplicates...")
     # select unique ingredients
     unique_ingreds = df[[json_column]].drop_duplicates(subset=[json_column], keep='first')
     # unique_ingreds = df[["ingredients"]].drop_duplicates(subset=['ingredients'], keep='first')
 
+    print(f"Merging counts with unique ingredients...")
     # merge counts with unique ingredients
     unique_ingreds = pd.merge(unique_ingreds, freq_df, on=json_column, how='left')
     # unique_ingreds = pd.merge(unique_ingreds, freq_df, on='ingredients', how='left')
 
+    print(f"Fill NaN values with 0...")
     # replace NaN values with 0
     unique_ingreds['count'].fillna(0, inplace=True)
 
+    print(f"Convert the 'float_column' to an integer...")
     # Convert the 'float_column' to an integer
     unique_ingreds['count'] = unique_ingreds['count'].astype(int)
 
+    print(f"Sort unique ingredients by count in descending order...")
     # sort unique_ingreds by count in descending order
     unique_ingreds = unique_ingreds.sort_values(by='count', ascending=False)
 
     # add unique id for each ingredient
     unique_ingreds["ingredient_id"] = unique_ingreds.index
 
+    print(f"Changing column names...")
     # rename json_column to "ingredient"
     unique_ingreds = unique_ingreds.rename(columns={json_column: "ingredient"})
     
@@ -319,6 +400,88 @@ def create_unique_ingredients(df, json_column = "ingredient_tags"):
 
     return unique_ingreds
 
+def make_unique_ingredients(input_csv_path, output_csv_path, json_column="ingredient_tags"):
+    """Create unique ingredients dataset from a local CSV file.
+
+    Args:
+        input_csv_path (str): Path to the input CSV file.
+        output_csv_path (str): Path to the output CSV file.
+        json_column (str): JSON column containing ingredient tags.
+
+    Returns:
+        list of dictionaries: Unique ingredients dataset.
+    """
+    #####################
+    #####################
+    
+    # tmp = pd.read_csv('/Users/anguswatters/Downloads/9d01169a86e24fb8867823a6fcd249a6_1705762724.csv')
+    # # tmp = pd.read_csv('/Users/anguswatters/Downloads/5dbe3e1610654706bd4da237da7be2bd_1705762730.csv')
+
+    # # tmp
+    # create_unique_ingredients(tmp)
+    # len(create_unique_ingredients(tmp))
+    # input_csv_path = '/Users/anguswatters/Downloads/9d01169a86e24fb8867823a6fcd249a6_1705762724.csv'
+    # output_csv_path = '/Users/anguswatters/Desktop/s3_downloads/u_ingredients_test.csv'
+    # json_column="ingredient_tags"
+
+    #####################
+    #####################
+
+    print(f"Generating unique ingredients from '{json_column}' column...")
+
+    # Read CSV file
+    with open(input_csv_path, 'r') as csv_file:
+        reader = csv.DictReader(csv_file)
+        data = list(reader)
+    # len(data)
+    # len(data[0])
+    # data[0]
+    
+    # Initialize a defaultdict to store ingredient counts
+    ingredient_counts = defaultdict(int)
+    
+    i = 0
+
+    # Process each row in the CSV data
+    for row in data:
+        print(f"--" * 5)
+        i += 1
+        print(f"Processing row {i}...")
+        print(f"row[json_column]: {row[json_column]}")
+        # row
+        # row[json_column]
+
+        # Extract the list of ingredients from the JSON column
+        ingredient_list = json.loads(row[json_column])[json_column]
+
+        # Normalize and count each ingredient
+        for ingredient in ingredient_list:
+            print(f"Processing ingredient '{ingredient}'...")
+            normalized_ingredient = ingredient.lower().strip()
+            print(f"----> Normalized ingredient: '{normalized_ingredient}'")
+            ingredient_counts[normalized_ingredient] += 1
+        print(f"--" * 5)
+        print(f"--" * 5)
+
+    # Convert ingredient counts to a list of dictionaries
+    unique_ingredients = [
+        {"ingredient": ingredient, "count": count, "ingredient_id": index}
+        for index, (ingredient, count) in enumerate(ingredient_counts.items())
+    ]
+
+    # Sort unique ingredients by count in descending order
+    unique_ingredients.sort(key=lambda x: x["count"], reverse=True)
+
+    # Save unique ingredients to CSV
+    with open(output_csv_path, 'w', newline='') as output_csv:
+        fieldnames = ["ingredient_id", "ingredient", "count"]
+        writer = csv.DictWriter(output_csv, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(unique_ingredients)
+
+    print(f"Unique ingredients dataset saved to '{output_csv_path}'.")
+
+    return unique_ingredients
 # import pandas as pd
 # import boto3
 # import json
@@ -337,7 +500,11 @@ def create_unique_ingredients(df, json_column = "ingredient_tags"):
 
 #################################################################
 #################################################################
-
+# Primary logic that gets run within main() function
+# - Download the object from S3, copy it into the database, and delete the local file
+# - Upsert the new recipes CSV data into the database
+# - Create unique ingredients dataset from new recipes CSV file (saved locally) and upsert all of the unique ingredients into the database
+# - Delete the local files
 def upsert_s3_data_into_db(client, s3_bucket, s3_object_key, local_file_path): 
     # Download the object from S3
     # msg_body = json.loads(msg["Body"])
@@ -382,6 +549,20 @@ def upsert_s3_data_into_db(client, s3_bucket, s3_object_key, local_file_path):
     # execute_upsert_script(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
 
     print(f"----> Succesfully UPSERTED {local_file_path} into 'recipe_table2' database!")
+    print(f"=====" * 8)
+    print(f"===========================")
+    print(f"==== ATTEMPT to UPSERT (unique_ingredients) ====")
+    print(f"==== Trying to UPSERT {local_file_path} into 'unique_ingredients' in database ====")
+    print(f"===========================")
+
+    # Try and execute the upsert script
+    # upsert_csv_into_db(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
+    create_and_upsert_unique_ingredients_data(DB_NAME, local_file_path)
+
+    # execute_upsert_script(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
+
+    print(f"----> Succesfully UPSERTED {local_file_path} into 'unique_ingredients' database!")
+    
     
     print(f"=====" * 8)
     print(f"=====" * 8)
@@ -398,9 +579,23 @@ def upsert_s3_data_into_db(client, s3_bucket, s3_object_key, local_file_path):
 
     return 
 
-# def upsert_unique_ingreds_into_db(db_name, local_file_path, target_table, staging_table):
+# Create a /copy command to copy CSV into a specified database table
+def create_slash_copy_cmd(db_name, table_name, csv_path):
+    copy_cols = "author, category, cook_time, cuisine, description, host, image, ingredient_tags, ingredients, instructions, prep_time, ratings, sorted_ingredient_tags, timestamp, title, total_time, url, yields"
+    
+    copy_command= f'\copy {table_name} ({copy_cols}) FROM \'{csv_path}\' DELIMITER \',\' CSV HEADER;'
+    
+    return copy_command
 
-
+# SQS consumer main function
+# - Long poll for message on SQS queue
+# - When new messages come in, loop through the batch of messages
+# - For each message call 'upsert_s3_data_into_db()' to: 
+    # --> DOWNLOAD the object from S3
+    # --> UPSERT it into the database
+    # --> CREATE unique ingredients
+    # --> UPSERT unique ingredients
+    # --> DELETE the local file
 def main() -> None:
 
     s3 = boto3.client("s3", region_name=AWS_REGION)
@@ -409,9 +604,11 @@ def main() -> None:
     empty_response_count = 0  # Initialize the count of consecutive empty responses
 
     while True:
+        print(f"----------------------------------------")
         print(f"---- STARTING NEW POLLING ITERATION ----")
         print(f"empty_response_count: {empty_response_count}")
-
+        print(f"----------------------------------------")
+        
         # Long poll for message on SQS queue
         response = sqs.receive_message(
             QueueUrl=SQS_QUEUE_URL,
@@ -465,13 +662,12 @@ def main() -> None:
             # insert_s3_obj_into_db(s3, s3_bucket, s3_object_key, local_file_path)
             upsert_s3_data_into_db(s3, s3_bucket, s3_object_key, local_file_path)
 
-            print(f"Successfully downloaded and inserted S3 CSV!")
+            print(f"Successfully downloaded and inserted new S3 CSV!")
 
-            recipes_df = pd.read_csv(local_file_path)
+            # recipes_df = pd.read_csv(local_file_path)
 
-            # Create unique ingredients dataset
-            unique_ingreds = create_unique_ingredients(recipes_df, json_column = "ingredient_tags")
-
+            # # Create unique ingredients dataset
+            # unique_ingreds = create_unique_ingredients(recipes_df, json_column = "ingredient_tags")
 
             # TODO: If successful, delete the message from the SQS queue
             # sqs.delete_message(
@@ -482,15 +678,6 @@ def main() -> None:
 
             print(f"====" * 7)
             print(f"====" * 7)
-
-# Create a /copy command to copy CSV into a specified database table
-def create_slash_copy_cmd(db_name, table_name, csv_path):
-    copy_cols = "author, category, cook_time, cuisine, description, host, image, ingredient_tags, ingredients, instructions, prep_time, ratings, sorted_ingredient_tags, timestamp, title, total_time, url, yields"
-    
-    copy_command= f'\copy {table_name} ({copy_cols}) FROM \'{csv_path}\' DELIMITER \',\' CSV HEADER;'
-    
-    return copy_command
-
 
 ################### ALL GOOD TO GO ##############################
 # def insert_s3_obj_into_db(client, s3_bucket, s3_object_key, local_file_path): 

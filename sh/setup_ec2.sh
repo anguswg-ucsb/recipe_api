@@ -126,7 +126,6 @@ sudo -u postgres psql ${DB_NAME} -c "
         count INTEGER
     );"
 
-
 # Create CSV file with headers
 echo "last_modified,size,s3_bucket,s3_object_key,copy_complete" | sudo tee /usr/local/s3_downloads/s3_object_manifest.csv
 
