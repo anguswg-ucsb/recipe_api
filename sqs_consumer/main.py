@@ -511,7 +511,7 @@ def upsert_s3_data_into_db(client, s3_bucket, s3_object_key, local_file_path):
 
     # s3_bucket = msg_body["Records"][0]["s3"]["bucket"]["name"]
     # s3_object_key = msg_body["Records"][0]["s3"]["object"]["key"]
-    # local_file_path = f"s3_downloads/{s3_object_key}"
+    # local_file_path = f"s3_downloads/{s3_key_filename}"
     # client = s3
 
     try:
@@ -647,15 +647,22 @@ def main() -> None:
             #     print(f"s3:TestEvent message. Skipping...")
             #     continue
     
-            s3_bucket = msg_body["Records"][0]["s3"]["bucket"]["name"]
-            s3_object_key = msg_body["Records"][0]["s3"]["object"]["key"]
-            local_file_path = f"{S3_DOWNLOADS_PATH}/{s3_object_key}"
+            # Get the S3 bucket and object key from the message
+            s3_bucket       = msg_body["Records"][0]["s3"]["bucket"]["name"]
+            s3_object_key   = msg_body["Records"][0]["s3"]["object"]["key"]
 
-            print(f"---" * 5)
-            print(f"s3_bucket: {s3_bucket}")
-            print(f"s3_object_key: {s3_object_key}")
-            print(f"local_file_path: {local_file_path}")
-            print(f"---" * 5)
+            # Get the filename from the object key
+            s3_key_filename = os.path.basename(s3_object_key)
+
+            # Create the local file path to save the S3 object to
+            local_file_path = f"{S3_DOWNLOADS_PATH}/{s3_key_filename}"
+
+            print(f"----" * 6)
+            print(f"- s3_bucket: {s3_bucket}")
+            print(f"- s3_object_key: {s3_object_key}")
+            print(f"- s3_key_filename: {s3_key_filename}")
+            print(f"- local_file_path: {local_file_path}")
+            print(f"----" * 6)
             print(f"Attempting download and insert of S3 CSV...")
 
             # Download the object from S3, copy it into the database, and delete the local file
@@ -679,6 +686,10 @@ def main() -> None:
             print(f"====" * 7)
             print(f"====" * 7)
 
+# Run the SQS consumer main function
+if __name__ == "__main__":
+    main()
+
 ################### ALL GOOD TO GO ##############################
 # def insert_s3_obj_into_db(client, s3_bucket, s3_object_key, local_file_path): 
 #     # Download the object from S3
@@ -686,7 +697,7 @@ def main() -> None:
 
 #     # s3_bucket = msg_body["Records"][0]["s3"]["bucket"]["name"]
 #     # s3_object_key = msg_body["Records"][0]["s3"]["object"]["key"]
-#     # local_file_path = f"s3_downloads/{s3_object_key}"
+#     # local_file_path = f"s3_downloads/{s3_key_filename}"
 #     # client = s3
 
 #     try:
@@ -780,8 +791,8 @@ def main() -> None:
 #     # Delete the local file
 #     subprocess.run(f"rm {local_file_path}", shell=True)
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
 
 
 # # execute_upsert_script()

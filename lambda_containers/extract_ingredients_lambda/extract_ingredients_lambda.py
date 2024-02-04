@@ -6,6 +6,9 @@ import time
 import re
 import ast
 
+# import datetime 
+from datetime import datetime
+
 # Set TRANSFORMERS_CACHE to /tmp
 os.environ["TRANSFORMERS_CACHE"] = "/tmp"
 
@@ -526,6 +529,26 @@ def get_csv_from_s3(message):
 
     return csv_df
 
+# Create a list of the [year, month, day] when the function is run (YYYY, MM, DD)
+# Use the [year, month, day] in prefix of the uploaded S3 object
+def get_event_date():
+
+    # Use the current date and time as the default
+    event_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+    # Parse the eventTime string into a datetime object
+    parsed_event_time = datetime.strptime(event_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+    # Extract month, day, and year
+    month = parsed_event_time.strftime("%m")
+    day   = parsed_event_time.strftime("%d")
+    year  = str(parsed_event_time.year)
+
+    # create a date_key string
+    print(f"Year: {year}, Month: {month}, Day: {day}")
+
+    return [year, month, day]
+
 # lambda handler function
 def extract_ingredients_lambda(event, context):
 
@@ -587,7 +610,11 @@ def extract_ingredients_lambda(event, context):
 
     print(f"---- Cleaning scraped data ----")
 
+    # clean the scraped dataframe
     df = clean_scraped_data(df)
+    
+    # get the current year, month, and day
+    year, month, day = get_event_date()
 
     # generate a random UUID to add to the OUTPUT_S3_OBJECT_NAME
     unique_id = f"{uuid.uuid4().hex}"
@@ -596,7 +623,8 @@ def extract_ingredients_lambda(event, context):
     csv_key = f"{unique_id}_{int(time.time())}.csv"
 
     # create the S3 filename
-    OUTPUT_S3_FILENAME = f"s3://{OUTPUT_S3_BUCKET}/{csv_key}"
+    OUTPUT_S3_FILENAME = f"s3://{OUTPUT_S3_BUCKET}/{year}/{month}/{day}/{csv_key}"
+    # OUTPUT_S3_FILENAME = f"s3://{OUTPUT_S3_BUCKET}/{csv_key}"
 
     print(f"Saving dataframe to S3:\n - OUTPUT_S3_FILENAME: '{OUTPUT_S3_FILENAME}'")
 

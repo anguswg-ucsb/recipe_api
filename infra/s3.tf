@@ -320,6 +320,104 @@ resource "aws_s3_bucket_policy" "output_bucket_policy" {
   ]
 }
 
+# ####################################
+# # AWS S3 bucket (database backup S3 bucket) #
+# ####################################
+
+# s3 bucket for raw data
+data "aws_s3_bucket" "backup_s3_bucket" {
+  bucket = var.backup_bucket_name
+}
+
+# # s3 bucket to store csv file
+# resource "aws_s3_bucket" "backup_s3_bucket" {
+#   bucket = "dish-recipes-bucket"
+#   #   depends_on = [
+#   #   aws_lambda_function.s3_to_db_lambda,
+#   #   aws_instance.ec2_db_instance,
+#   # ]
+# }
+
+#######################################
+# S3 bucket permissions (database backup S3 bucket) #
+#######################################
+
+# Enable object versioning on RAW S3 bucket
+resource "aws_s3_bucket_versioning" "backup_s3_bucket_versioning" {
+  bucket = data.aws_s3_bucket.backup_s3_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# s3 bucket ownership controls
+resource "aws_s3_bucket_ownership_controls" "backup_s3_bucket_ownership_controls" {
+  bucket = data.aws_s3_bucket.backup_s3_bucket.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+# s3 bucket public access block
+resource "aws_s3_bucket_public_access_block" "backup_s3_public_access_block" {
+  bucket = data.aws_s3_bucket.backup_s3_bucket.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+
+}
+
+resource "aws_s3_bucket_acl" "backup_s3_bucket_acl" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.backup_s3_bucket_ownership_controls,
+    aws_s3_bucket_public_access_block.backup_s3_public_access_block,
+  ]
+
+  bucket = data.aws_s3_bucket.backup_s3_bucket.id
+  acl    = "private"
+}
+
+data "aws_iam_policy_document" "backup_s3_bucket_policy_document" {
+  statement {
+    sid = "AllowCurrentAccount"
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:ListBucket"
+    ]
+
+    resources = [
+      data.aws_s3_bucket.backup_s3_bucket.arn,
+      "${data.aws_s3_bucket.backup_s3_bucket.arn}/*"
+    ]
+
+    condition {
+      test = "StringEquals"
+      variable = "aws:PrincipalAccount"
+      values = [var.aws_account_number]
+    }
+  }
+}
+
+# s3 bucket policy to allow public access
+resource "aws_s3_bucket_policy" "backup_bucket_policy" {
+  bucket = data.aws_s3_bucket.backup_s3_bucket.id
+  policy = data.aws_iam_policy_document.backup_s3_bucket_policy_document.json
+  depends_on = [
+    aws_s3_bucket_acl.backup_s3_bucket_acl,
+    aws_s3_bucket_ownership_controls.backup_s3_bucket_ownership_controls,
+    aws_s3_bucket_public_access_block.backup_s3_public_access_block,
+  ]
+}
+
 # #######################################
 # # AWS S3 bucket (SQS consumer script) #
 # #######################################
@@ -335,6 +433,14 @@ resource "aws_s3_object" "script_bucket_object" {
   key    = var.recipe_script_filename
   source = local.recipe_script_path
   etag   = filemd5(local.recipe_script_path)
+}
+
+# S3 object for bash script that runs on EC2 instance to backup recipes database
+resource "aws_s3_object" "backup_script_bucket_object" {
+  bucket = aws_s3_bucket.script_bucket.id
+  key    = var.recipe_backup_script_filename
+  source = local.recipe_backup_script_path
+  etag   = filemd5(local.recipe_backup_script_path)
 }
 
 #################################

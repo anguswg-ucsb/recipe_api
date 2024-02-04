@@ -9,6 +9,9 @@ echo "The value of SCRIPTS_S3_BUCKET is: ${SCRIPTS_S3_BUCKET}"
 echo "The value of SQS Consumer python script is: ${SQS_CONSUMER_PYTHON_SCRIPT}"
 echo "The SQS_QUEUE_URL is: ${SQS_QUEUE_URL}"
 
+echo "The value of BACKUP_BUCKET is: ${BACKUP_BUCKET}"
+echo "The value of BACKUP_DB_SCRIPT is: ${BACKUP_DB_SCRIPT}"
+
 # update 
 sudo apt-get update -y && sudo apt-get upgrade -y
 
@@ -126,15 +129,43 @@ sudo -u postgres psql ${DB_NAME} -c "
         count INTEGER
     );"
 
+echo "Making shell scripts directory..."
+
+# create a directory for bash scripts
+sudo mkdir /usr/local/sh
+
+echo "Downloading backup database shell script from S3..."
+
+# Download the SQS Consumer Python script from S3
+sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${BACKUP_DB_SCRIPT} /usr/local/sh/${BACKUP_DB_SCRIPT}
+sudo chmod +x /usr/local/sh/${BACKUP_DB_SCRIPT}
+
+echo "Adding cron job to run every 2 minutes..."
+echo "--> Backing up ${DB_NAME} to ${BACKUP_BUCKET} every 2 minutes"
+
+# # Add cron job to run on the 5th minute of every hour
+# echp "5 */1 * * * /usr/local/sh/${BACKUP_DB_SCRIPT}" ${DB_NAME} ${BACKUP_BUCKET} | crontab -
+
+# # Add cron job to run every 3 minutes
+echo "* /2 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET}"| crontab -
+# echo "* /2 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT}" ${DB_NAME} ${BACKUP_BUCKET} | crontab -
+
+# (crontab -l 2>/dev/null || echo ""; echo "* /2 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET}") | crontab -
+# (crontab -l 2>/dev/null || echo ""; echo "*/5 * * * * /path/to/job -with args") | crontab -
+
+
 # Create CSV file with headers
 echo "last_modified,size,s3_bucket,s3_object_key,copy_complete" | sudo tee /usr/local/s3_downloads/s3_object_manifest.csv
+
+echo "Making sqs_consumer directory..."
 
 # create a directory for SQS consumer python script
 sudo mkdir /usr/local/sqs_consumer
 
+echo "Downloading SQS Consumer Python script from S3..."
+
 # Download the SQS Consumer Python script from S3
 sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${SQS_CONSUMER_PYTHON_SCRIPT} /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
-
 sudo chmod +x /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
 
 # path for S3 files to be downloaded to
@@ -215,6 +246,7 @@ echo "Executing python script..."
 # AWS_REGION=$AWS_REGION \
 # python3 /usr/local/sqs_consumer/main.py
 
+####################################################################
 ####################################################################
 ####################################################################
 

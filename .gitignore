@@ -270,3 +270,16 @@ test_database.db
 test_data1.csv
 test_data2.csv
 test_data3.csv
+
+sh/test_defaults.sh
+
+manifest.json
+
+s3_inventory_example.csv
+s3_inventory_example.gz.csv
+
+s3_inventory_example1.csv
+s3_inventory_example1.gz.csv
+
+recipes-output-bucket-inventory/*
+recipes-output-bucket-inventory/

@@ -134,6 +134,20 @@ echo 'export SQS_QUEUE_URL=$SQS_QUEUE_URL' >> ~/.bashrc
 # export S3_DOWNLOADS_PATH="/usr/local/s3_downloads"
 # export SQS_QUEUE_URL=${SQS_QUEUE_URL}
 
+echo "DB_NAME=${DB_NAME}" | sudo tee -a /etc/environment
+echo "S3_DOWNLOADS_PATH=${S3_DOWNLOADS_PATH}" | sudo tee -a /etc/environment
+echo "SQS_QUEUE_URL=${SQS_QUEUE_URL}" | sudo tee -a /etc/environment
+
+echo DB_NAME=\"$DB_NAME\" >> /etc/environment
+echo S3_DOWNLOADS_PATH=\"$S3_DOWNLOADS_PATH\" >> /etc/environment
+echo SQS_QUEUE_URL=\"$SQS_QUEUE_URL\" >> /etc/environment
+
+echo "Exporting using sudo tee"
+
+echo DB_NAME=\"$DB_NAME\" | sudo tee -a /etc/environment
+echo S3_DOWNLOADS_PATH=\"$S3_DOWNLOADS_PATH\" | sudo tee -a /etc/environment
+echo SQS_QUEUE_URL=\"$SQS_QUEUE_URL\" | sudo tee -a /etc/environment
+
 # Provide a print statement to show the value of SQS_QUEUE_URL
 echo "The SQS_QUEUE_URL is: ${SQS_QUEUE_URL}"
 
@@ -141,8 +155,12 @@ echo "The SQS_QUEUE_URL is: ${SQS_QUEUE_URL}"
 echo "Giving python script execute permissions..."
 echo "Python script to execute: ${SQS_CONSUMER_PYTHON_SCRIPT}"
 
+python3 /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
+python3 /usr/local/sqs_consumer/main.py
+
 # print statement stating that python script is being executed
 echo "Executing python script..."
+DB_NAME=$DB_NAME S3_DOWNLOADS_PATH=$S3_DOWNLOADS_PATH SQS_QUEUE_URL=$SQS_QUEUE_URL AWS_REGION=$AWS_REGION python3 /usr/local/sqs_consumer/main.py
 
 # print echo statement stating that postgressql will be restarted
 echo "Restarting PostgreSQL..."

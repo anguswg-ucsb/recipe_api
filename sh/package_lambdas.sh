@@ -81,6 +81,7 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
             --implementation cp \
             --python-version 3.11 \
             --only-binary=:all: --upgrade \
+            -q \
             -r "$SUBDIR/requirements.txt"
 
         # check if the current directory is the "app" directory, if not, then find and remove unwanted directories
@@ -100,6 +101,23 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         # Go into the PKG_DIR directory
         cd "$PKG_DIR" 
 
+        # Count the number of files in the directory
+        file_count=$(find "$PKG_DIR" -type f | wc -l)
+
+        echo "Number of files in the directory: $file_count"
+
+        # Check if the directory is empty
+        if [ "$file_count" -eq 0 ]; then
+            echo "PKG_DIR directory is empty"
+        else
+            echo "PKG_DIR directory is NOT empty."
+        fi
+
+        echo "Adding simple JSON file to make sure directory is NOT empty."
+            
+        # Create an empty JSON file with the file count to make sure the directory is NOT empty
+        echo "{\"$DIR_NAME\": $file_count}" > "$PKG_DIR/file_count.json"
+        
         echo "------------------------------------------------"
         echo "Zipping 'PKG_DIR' contents into 'ZIP_FILE'..."
 
@@ -109,7 +127,7 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         echo "------------------------------------------------"
 
         # Create the initial ZIP file with the Python packages
-        zip -r9 "$ZIP_FILE" .
+        zip -r9 -q "$ZIP_FILE" .
 
         # Go back to the original directory
         cd "$BASE_DIR/$APP_DIR/"

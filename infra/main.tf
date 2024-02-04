@@ -35,6 +35,7 @@ locals {
 
   # SQS consumer python script
   recipe_script_path = "../sqs_consumer/main.py"
+  recipe_backup_script_path = "../sh/backup_db.sh"
 
   # name tag for resources
   name_tag = "recipe-app"

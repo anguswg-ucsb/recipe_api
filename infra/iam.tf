@@ -232,6 +232,35 @@ resource "aws_iam_policy" "ec2_policy" {
 EOF
 }
 
+# # add policy for EC2 to receive SQS messages AND Get/Put/List S3 objects from database backup S3 bucket
+# resource "aws_iam_policy" "ec2_policy" {
+#   name = "EC2-SQS-ReceiveMessage"
+
+#   policy = <<EOF
+# {
+#     "Version": "2012-10-17",
+#     "Statement": [
+#       {
+#         "Sid": "Stmt1426528957000",
+#         "Effect": "Allow",
+#         "Action": [
+#           "sqs:ReceiveMessage",
+#           "sqs:DeleteMessage",
+#           "sqs:GetQueueAttributes",
+#           "s3:GetObject",
+#           "s3:PutObject",
+#           "s3:ListBucket"
+#         ],
+#         "Resource": [
+#           "${aws_sqs_queue.sqs_output_queue.arn}",
+#           "${aws_s3_bucket.raw_s3_bucket.arn}",
+#         ]
+#       }
+#     ]
+# }
+# EOF
+# }
+
 # add policy for EC2 to recieve SQS messages
 resource "aws_iam_role_policy_attachment" "ec2_policy_attachment" {
   role       = aws_iam_role.ec2_role.name

@@ -26,13 +26,16 @@ resource "aws_instance" "ec2_db_instance" {
       DB_PASSWORD   = jsondecode(aws_secretsmanager_secret_version.ec2_secret_version.secret_string)["password"],
       DB_NAME       = jsondecode(aws_secretsmanager_secret_version.ec2_secret_version.secret_string)["db_name"],
       S3_BUCKET                  = var.output_s3_bucket_name,
+      BACKUP_BUCKET              = var.backup_s3_bucket_name,
       # S3_FILE       = var.s3_csv_file_name,
       # S3_UNIQUE_INGREDS_FILE = var.s3_unique_ingred_file_name,
       # MAIN_PY_SCRIPT = data.template_file.main_py.rendered,  # Use the rendered content of main.py
       SCRIPTS_S3_BUCKET          = var.recipe_script_bucket_name,
       SQS_CONSUMER_PYTHON_SCRIPT = var.recipe_script_filename,
+      BACKUP_DB_SCRIPT           = var.recipe_backup_script_filename,
       SQS_QUEUE_URL              = aws_sqs_queue.sqs_output_queue.url,
       S3_DOWNLOADS_PATH          = var.s3_downloads_path,
+      BACKUO_DOWNLOADS_PATH      = var.backup_downloads_path,
       AWS_REGION                 = var.aws_region,
   })}")
 
