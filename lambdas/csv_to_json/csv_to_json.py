@@ -101,7 +101,7 @@ def process_csv_chunk_message(message):
 
 
 # lambda handler function
-def send_json_recipes_lambda(event, context):
+def csv_to_json(event, context):
 
     print(f"=====================")
     print(f'---->\n Value of event: {event}')
@@ -130,7 +130,7 @@ def send_json_recipes_lambda(event, context):
     return sqs_batch_response
 
 # # lambda handler function
-# def send_json_recipes_lambda(event, context):
+# def csv_to_json_lambda(event, context):
 
 #     # Get the SQS message from the event 
 #     message = event['Records'][0]["body"]

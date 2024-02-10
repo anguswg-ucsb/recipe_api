@@ -7,6 +7,17 @@
 
 # Output: "deploy" directory will be created in the root directory, and the ZIP files will be placed there.
 
+# Provide arguments:
+# Base directory (BASE_DIR) - the root directory of the project, if not provided, use the current directory
+# RUNNING_ON_GITHUB_ACTION as an argument to the script
+# - set true if running on GitHub Actions, otherwise set to false
+# - if true then the script will export the environment variables to $GITHUB_ENV
+
+# Example: source sh/package_lambdas.sh /Users/anguswatters/Desktop/github/recipe_api true
+# Example: source sh/package_lambdas.sh /Users/anguswatters/Desktop/github/recipe_api
+
+# Output: "deploy" directory will be created in the root directory, and the ZIP files will be placed there.
+
 # Example directory structure:
 # root/
 #   lambdas/
@@ -23,16 +34,23 @@
 # # Base project directory
 # BASE_DIR=${1:-"/Users/anguswatters/Desktop/github/recipe_api"}
 
-# Check if the BASE_DIR is provided as a command-line argument, if so, use it, otherwise use the current directory
-if [ -z "$1" ] || [ "$1" == "." ]; then
-    BASE_DIR=$(pwd)  # Use the current directory if no argument is provided
-    echo "BASE_DIR not provided, using current directory: $BASE_DIR"
-    echo "pwd: $(pwd)"
-else
-    BASE_DIR=$1
-fi
+# # Check if the BASE_DIR is provided as a command-line argument, if so, use it, otherwise use the current directory
+# if [ -z "$1" ] || [ "$1" == "." ]; then
+#     BASE_DIR=$(pwd)  # Use the current directory if no argument is provided
+#     echo "BASE_DIR not provided, using current directory: $BASE_DIR"
+#     echo "pwd: $(pwd)"
+# else
+#     BASE_DIR=$1
+# fi
 
-echo "BASE_DIR: $BASE_DIR"
+# # Check if the BASE_DIR is provided as a command-line argument, if so, use it, 
+# otherwise use the current working directory 
+BASE_DIR=${1:-$(pwd)}
+
+echo "- BASE_DIR: $BASE_DIR"
+
+# Flag to determine whether to export variables to $GITHUB_ENV
+RUNNING_ON_GITHUB_ACTION=${2:-"false"}
 
 # Set the deploy directory
 DEPLOY_DIR="$BASE_DIR/deploy"
@@ -56,6 +74,7 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         PKG_DIR="$BASE_DIR/$APP_DIR/package"
         TARGET_DIR="$SUBDIR/package"
         ZIP_FILE="$DEPLOY_DIR/$DIR_NAME.zip"
+        RELATIVE_ZIP_FILE="../deploy/$DIR_NAME.zip"  # Relative path to the ZIP file
 
         echo "--------------------------------------------------------------"
         echo "---- Creating lambda package: '$DIR_NAME' ----"
@@ -66,6 +85,7 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         echo "- PKG_DIR: $PKG_DIR"
         echo "- TARGET_DIR: $TARGET_DIR"
         echo "- ZIP_FILE: $ZIP_FILE"
+        echo "- RELATIVE_ZIP_FILE: $RELATIVE_ZIP_FILE"
         echo "------------------------------------------------"
 
         echo "Making temporary directory for Python packages"
@@ -74,15 +94,18 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         mkdir -p "$PKG_DIR"
 
         echo "Installing Python packages from 'requirements.txt to 'PKG_DIR'"
+        
+        ########## UNCOMMENT BELOW ##############
 
-        pip install \
-            --platform manylinux2014_x86_64 \
-            --target "$PKG_DIR" \
-            --implementation cp \
-            --python-version 3.11 \
-            --only-binary=:all: --upgrade \
-            -q \
-            -r "$SUBDIR/requirements.txt"
+        # pip install \
+        #     --platform manylinux2014_x86_64 \
+        #     --target "$PKG_DIR" \
+        #     --implementation cp \
+        #     --python-version 3.11 \
+        #     --only-binary=:all: --upgrade \
+        #     -q \
+        #     -r "$SUBDIR/requirements.txt"
+        ########## UNCOMMENT ABOVE ##############
 
         # check if the current directory is the "app" directory, if not, then find and remove unwanted directories
         if [ "$DIR_NAME" != "app" ]; then
@@ -117,7 +140,7 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
             
         # Create an empty JSON file with the file count to make sure the directory is NOT empty
         echo "{\"$DIR_NAME\": $file_count}" > "$PKG_DIR/file_count.json"
-        
+
         echo "------------------------------------------------"
         echo "Zipping 'PKG_DIR' contents into 'ZIP_FILE'..."
 
@@ -126,14 +149,19 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         echo -e " PKG_DIR: '$PKG_DIR' \n   --------> \n ZIP_FILE: '$ZIP_FILE'"
         echo "------------------------------------------------"
 
+        ########## UNCOMMENT BELOW ##############
         # Create the initial ZIP file with the Python packages
         zip -r9 -q "$ZIP_FILE" .
 
         # Go back to the original directory
         cd "$BASE_DIR/$APP_DIR/"
 
+        ########## UNCOMMENT ABOVE ##############
+
         echo "Updated ZIP_FILE with DIR_NAME contents"
         # echo "Updated '$ZIP_FILE' with '$DIR_NAME' contents"
+        
+        ########## UNCOMMENT BELOW ##############
 
         # For all directories except "app", add the contents of the given lambdas/ subdirectory (DIR_NAME) 
         # to the ZIP file EXCLUDING the "config.py" file,
@@ -149,12 +177,93 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
             # Add the contents of the given lambdas/ subdirectory (DIR_NAME) to the ZIP file (KEEP the "config.py" file)
             zip -g "$ZIP_FILE" -r "$DIR_NAME"
         fi
+        ########## UNCOMMENT ABOVE ##############
+
 
         echo "Removing $PKG_DIR"
+
+        ########## UNCOMMENT BELOW ##############
 
         # remove the PKG_DIR directory
         rm -rf "$PKG_DIR"
 
+        ########## UNCOMMENT ABOVE ##############
+        # -----------------------------------------------------------
+        # --- Create Terraform variables for each lambda function ---
+        # -----------------------------------------------------------
+
+        # Create a TF variable name from the directory name
+        TF_VAR_LOCAL_ZIP_PATH="${DIR_NAME%.zip}_zip"
+
+        # Export the relative zip file path as an environment variable with TF_VAR_<DIR_NAME>
+        export "TF_VAR_$TF_VAR_LOCAL_ZIP_PATH"="$RELATIVE_ZIP_FILE"
+
+        echo "Exported TF_VAR_$TF_VAR_LOCAL_ZIP_PATH: $RELATIVE_ZIP_FILE"
+
+        # Check if the string starts with "mros", if it doesn't, append "mros" to the front
+        # Then replace any underscores with hypens
+        if [[ $DIR_NAME != recipes* ]]; then
+            # If it doesn't start with "mros", append "mros" to the front
+            LAMBDA_FUNCTION_NAME="recipes_$DIR_NAME"
+            LAMBDA_FUNCTION_NAME=${LAMBDA_FUNCTION_NAME//_/\-}
+        else
+            LAMBDA_FUNCTION_NAME="$DIR_NAME"
+            LAMBDA_FUNCTION_NAME=${LAMBDA_FUNCTION_NAME//_/\-}
+
+        fi
+        
+        echo "LAMBDA_FUNCTION_NAME: $LAMBDA_FUNCTION_NAME"
+
+        # ---- NAME TO USAE FOR THE LAMBDA FUNCTION ON AWS exported as: ----
+        # ---- "TF_VAR_<DIR_NAME>_lambda_function_name" = "$LAMBDA_FUNCTION_NAME" ----
+
+        # Create a TF variable name from the directory name
+        TF_VAR_FUNCTION_NAME="${DIR_NAME}_lambda_function_name"
+
+        echo "TF_VAR_FUNCTION_NAME: $TF_VAR_FUNCTION_NAME"
+
+        export "TF_VAR_$TF_VAR_FUNCTION_NAME"="$LAMBDA_FUNCTION_NAME"
+
+        echo "Exported TF_VAR_$TF_VAR_FUNCTION_NAME: $LAMBDA_FUNCTION_NAME"
+
+        # ---- NAME OF THE ZIP FILE FOR THE LAMBDA FUNCTION exported as: ----
+        # ---- "TF_VAR_<DIR_NAME>_lambda_zip_file_name" = "$DIR_NAME.zip" ----
+
+        # Create a TF variable name from the directory name
+        TF_VAR_FUNCTION_ZIP_FILENAME="${DIR_NAME}_lambda_zip_file_name"
+
+        echo "TF_VAR_FUNCTION_ZIP_FILENAME: $TF_VAR_FUNCTION_ZIP_FILENAME"
+
+        export "TF_VAR_$TF_VAR_FUNCTION_ZIP_FILENAME"="${DIR_NAME}.zip"
+
+        echo "Exported TF_VAR_$TF_VAR_FUNCTION_ZIP_FILENAME: ${DIR_NAME}.zip"
+        if [ "$DIR_NAME" != "app" ]; then
+            HANDLER="${DIR_NAME}.${DIR_NAME}.${DIR_NAME}"
+        else
+            HANDLER="app.main.handler"
+        fi
+
+        echo "> HANDLER: $HANDLER"
+
+        # Check if the script is running on GitHub Actions (RUNNING_ON_GITHUB_ACTION=true), if so
+        # then export the environment variables to $GITHUB_ENV so they are made available to
+        # the next steps in the workflow
+        if [[ "$RUNNING_ON_GITHUB_ACTION" == "true" ]]; then
+
+            echo "Running on GitHub Actions, exporting environment variables to Github Env..."
+            
+            # Export the environment variables to $GITHUB_ENV
+            # Lambda function name
+            echo "TF_VAR_$TF_VAR_FUNCTION_NAME=$LAMBDA_FUNCTION_NAME" >> $GITHUB_ENV
+
+            # Lambda function ZIP file name
+            echo "TF_VAR_$TF_VAR_FUNCTION_ZIP_FILENAME=${DIR_NAME}.zip" >> $GITHUB_ENV
+
+            # Lambda function local ZIP path
+            echo "TF_VAR_$TF_VAR_LOCAL_ZIP_PATH=$RELATIVE_ZIP_FILE" >> $GITHUB_ENV
+
+            echo "Exported TF_VAR_$TF_VAR_FUNCTION_NAME, TF_VAR_$TF_VAR_FUNCTION_ZIP_FILENAME, and TF_VAR_$TF_VAR_LOCAL_ZIP_PATH to Github Env"
+        fi
         cd "$BASE_DIR"
 
         echo "====================================================="

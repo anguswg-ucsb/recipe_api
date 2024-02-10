@@ -18,7 +18,7 @@
 # RUN mkdir -p ./model
 
 # # Copy function code
-# COPY extract_ingredients_lambda/extract_ingredients_lambda.py ${LAMBDA_TASK_ROOT}
+# COPY extract_ingredients/extract_ingredients.py ${LAMBDA_TASK_ROOT}
 
 # # Download and save the model from HuggingFace
 # RUN python3 - <<EOF
@@ -38,7 +38,7 @@
 # EOF
 
 # # Set the CMD to your handler
-# CMD [ "extract_ingredients_lambda.extract_ingredients_lambda" ]
+# CMD [ "extract_ingredients.extract_ingredients" ]
 
 FROM public.ecr.aws/lambda/python:3.11-x86_64
 # FROM public.ecr.aws/lambda/python:3.11.2023.12.13.21
@@ -66,7 +66,7 @@ RUN pip install -r requirements.txt
 # RUN pip install git+https://github.com/chambliss/foodbert.git
 
 # Copy main python function over
-COPY extract_ingredients_lambda.py ./
+COPY extract_ingredients.py ./
 
 # Create a model directory
 RUN mkdir model
@@ -95,5 +95,5 @@ model.save_pretrained(save_directory)
 EOF
 
 # Set the CMD to your handler
-CMD [ "extract_ingredients_lambda.extract_ingredients_lambda" ]
+CMD [ "extract_ingredients.extract_ingredients" ]
 

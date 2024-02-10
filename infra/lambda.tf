@@ -11,11 +11,14 @@
 
 resource "aws_lambda_function" "chunk_csv_lambda_function" {
     s3_bucket        = aws_s3_bucket.lambda_s3_bucket.bucket
-    s3_key           = var.chunk_csv_lambda_function_zip_file
+    s3_key           = var.chunk_csv_lambda_zip_file_name
     s3_object_version = aws_s3_object.chunk_csv_lambda_code_object.version_id
-    source_code_hash = var.chunk_csv_lambda_function_zip_file
+    source_code_hash = var.chunk_csv_lambda_zip_file_name
+
     function_name    = var.chunk_csv_lambda_function_name
-    handler          = "chunk_csv_lambda.chunk_csv_lambda.chunk_csv_lambda"
+    handler          = var.chunk_csv_lambda_handler
+    # handler          = "chunk_csv.chunk_csv.chunk_csv"
+
     role             = aws_iam_role.recipe_pipeline_lambda_role.arn
     runtime          = "python3.11"
     architectures    = ["x86_64"]
@@ -54,16 +57,17 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
 ########################################################
 
 # lambda function consumes chunked CSV SQS queue and iterates over chunk of CSV in S3 and sends each row as a JSON message to the SQS "to scrape" queue
-resource "aws_lambda_function" "send_json_lambda_function" {
-  s3_bucket        = aws_s3_bucket.lambda_s3_bucket.bucket
-  s3_key           = var.send_json_recipes_lambda_function_zip_file
-  s3_object_version = aws_s3_object.recipe_scraper_lambda_code_object.version_id
-  source_code_hash = var.send_json_recipes_lambda_function_zip_file
-  # source_code_hash = filebase64sha256(local.recipe_scraper_lambda_zip)
-  # source_code_hash = aws_s3_object.recipe_scraper_lambda_code_object.etag
+resource "aws_lambda_function" "csv_to_json_lambda_function" {
+  s3_bucket         = aws_s3_bucket.lambda_s3_bucket.bucket
+  s3_key            = var.csv_to_json_lambda_zip_file_name
+  s3_object_version = aws_s3_object.csv_to_json_lambda_code_object.version_id
+  source_code_hash  = var.csv_to_json_lambda_zip_file_name
+  # source_code_hash = filebase64sha256(local.csv_to_json_zip)
 
-  function_name    = var.send_json_recipes_lambda_function_name
-  handler          = "send_json_recipes_lambda.send_json_recipes_lambda.send_json_recipes_lambda"
+  function_name    = var.csv_to_json_lambda_function_name
+  handler          = var.csv_to_json_lambda_handler
+  # handler          = "csv_to_json.csv_to_json.csv_to_json"
+
   role             = aws_iam_role.recipe_pipeline_lambda_role.arn
   runtime          = "python3.11"
   architectures    = ["x86_64"]
@@ -78,7 +82,7 @@ resource "aws_lambda_function" "send_json_lambda_function" {
   # Attach the Lambda function to the CloudWatch Logs group
   environment {
     variables = {
-        CW_LOG_GROUP         = aws_cloudwatch_log_group.send_json_recipes_lambda_log_group.name,
+        CW_LOG_GROUP         = aws_cloudwatch_log_group.csv_to_json_lambda_log_group.name,
         CHUNK_SQS_QUEUE_URL     = aws_sqs_queue.sqs_csv_chunk_queue.url,
         OUTPUT_SQS_QUEUE_URL     = aws_sqs_queue.sqs_to_scrape_queue.url,
     }
@@ -86,10 +90,10 @@ resource "aws_lambda_function" "send_json_lambda_function" {
 
   depends_on = [
     aws_s3_bucket.lambda_s3_bucket,
-    aws_s3_object.send_json_lambda_code_object,
+    aws_s3_object.csv_to_json_lambda_code_object,
     # aws_s3_bucket_notification.raw_s3_bucket_notification,
     aws_iam_role_policy_attachment.lambda_logs_policy_attachment,
-    aws_cloudwatch_log_group.send_json_recipes_lambda_log_group
+    aws_cloudwatch_log_group.csv_to_json_lambda_log_group
   ]
   
   tags = {
@@ -105,10 +109,10 @@ resource "aws_lambda_function" "send_json_lambda_function" {
 # Lambda SQS Event Source Mapping
 resource "aws_lambda_event_source_mapping" "send_json_lambda_sqs_event_source_mapping" {
   event_source_arn = aws_sqs_queue.sqs_csv_chunk_queue.arn
-  function_name    = aws_lambda_function.send_json_lambda_function.function_name
+  function_name    = aws_lambda_function.csv_to_json_lambda_function.function_name
   batch_size       = 1
   depends_on = [
-    aws_lambda_function.send_json_lambda_function,
+    aws_lambda_function.csv_to_json_lambda_function,
     aws_sqs_queue.sqs_csv_chunk_queue,
   ]
 }
@@ -117,7 +121,7 @@ resource "aws_lambda_event_source_mapping" "send_json_lambda_sqs_event_source_ma
 resource "aws_lambda_permission" "allow_sqs_invoke_send_json_lambda" {
   statement_id  = "AllowSQSInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.send_json_lambda_function.arn}"
+  function_name = "${aws_lambda_function.csv_to_json_lambda_function.arn}"
   principal = "sqs.amazonaws.com"
   source_arn = "${aws_sqs_queue.sqs_csv_chunk_queue.arn}"
 }
@@ -129,16 +133,18 @@ resource "aws_lambda_permission" "allow_sqs_invoke_send_json_lambda" {
 # lambda function triggered when a JSON file is uploaded to the raw S3 bucket (ObjectCreated)
 # Function loads the JSON data and gets more data from the URL in the JSON and
 # adds to new found data to the original JSON, then uploads this to the staging bucket
-resource "aws_lambda_function" "recipe_scraper_lambda_function" {
+resource "aws_lambda_function" "recipes_scraper_lambda_function" {
   s3_bucket        = aws_s3_bucket.lambda_s3_bucket.bucket
-  s3_key           = var.scraper_lambda_function_zip_file
-  s3_object_version = aws_s3_object.recipe_scraper_lambda_code_object.version_id
-  source_code_hash = var.scraper_lambda_function_zip_file
-  # source_code_hash = filebase64sha256(local.recipe_scraper_lambda_zip)
-  # source_code_hash = aws_s3_object.recipe_scraper_lambda_code_object.etag
+  s3_key           = var.recipes_scraper_lambda_zip_file_name
+  s3_object_version = aws_s3_object.recipes_scraper_lambda_code_object.version_id
+  source_code_hash = var.recipes_scraper_lambda_zip_file_name
+  # source_code_hash = filebase64sha256(local.recipes_scraper_zip)
+  # source_code_hash = aws_s3_object.recipes_scraper_lambda_code_object.etag
 
-  function_name    = var.scraper_lambda_function_name
-  handler          = "recipe_scraper_lambda.recipe_scraper_lambda.recipe_scraper_lambda"
+  function_name    = var.recipes_scraper_lambda_function_name
+  handler          = var.recipes_scraper_lambda_handler
+
+  # handler          = "recipes_scraper.recipes_scraper.recipes_scraper"
   role             = aws_iam_role.recipe_pipeline_lambda_role.arn
   runtime          = "python3.11"
   architectures    = ["x86_64"]
@@ -160,7 +166,7 @@ resource "aws_lambda_function" "recipe_scraper_lambda_function" {
   # Attach the Lambda function to the CloudWatch Logs group
   environment {
     variables = {
-        CW_LOG_GROUP         = aws_cloudwatch_log_group.raw_recipes_lambda_log_group.name,
+        CW_LOG_GROUP         = aws_cloudwatch_log_group.recipes_scraper_lambda_log_group.name,
         OUTPUT_S3_BUCKET     = aws_s3_bucket.stage_s3_bucket.bucket,
         SCRAPE_OPS_API_KEY   = var.scrape_ops_api_key,
         DYNAMODB_TABLE       = aws_dynamodb_table.recipe_scraper_table.name,
@@ -173,10 +179,10 @@ resource "aws_lambda_function" "recipe_scraper_lambda_function" {
 
   depends_on = [
     aws_s3_bucket.lambda_s3_bucket,
-    aws_s3_object.recipe_scraper_lambda_code_object,
+    aws_s3_object.recipes_scraper_lambda_code_object,
     # aws_s3_bucket_notification.raw_s3_bucket_notification,
     aws_iam_role_policy_attachment.lambda_logs_policy_attachment,
-    aws_cloudwatch_log_group.raw_recipes_lambda_log_group,
+    aws_cloudwatch_log_group.recipes_scraper_lambda_log_group,
     aws_s3_bucket.stage_s3_bucket,
   ]
   
@@ -190,7 +196,7 @@ resource "aws_lambda_function" "recipe_scraper_lambda_function" {
 # resource "aws_lambda_permission" "allow_s3_invoke" {
 #   statement_id  = "AllowS3Invoke"
 #   action        = "lambda:InvokeFunction"
-#   function_name = "${aws_lambda_function.recipe_scraper_lambda_function.arn}"
+#   function_name = "${aws_lambda_function.recipes_scraper_lambda_function.arn}"
 #   principal = "s3.amazonaws.com"
 #   source_arn = "${aws_s3_bucket.raw_s3_bucket.arn}"
 # }
@@ -201,23 +207,23 @@ resource "aws_lambda_function" "recipe_scraper_lambda_function" {
 ######################################################################################
 
 # Lambda SQS Event Source Mapping
-resource "aws_lambda_event_source_mapping" "recipe_scraper_lambda_sqs_event_source_mapping" {
+resource "aws_lambda_event_source_mapping" "recipes_scraper_lambda_sqs_event_source_mapping" {
   event_source_arn = aws_sqs_queue.sqs_to_scrape_queue.arn
-  function_name    = aws_lambda_function.recipe_scraper_lambda_function.function_name
+  function_name    = aws_lambda_function.recipes_scraper_lambda_function.function_name
   batch_size       = 40
   maximum_batching_window_in_seconds = 20      # (max time to wait for batch to fill up)
   function_response_types = ["ReportBatchItemFailures"]
   depends_on = [
-    aws_lambda_function.recipe_scraper_lambda_function,
+    aws_lambda_function.recipes_scraper_lambda_function,
     aws_sqs_queue.sqs_to_scrape_queue,
   ]
 }
 
 # Allow the "to scrape" SQS queue to invoke the Recipe Scraper Lambda function
-resource "aws_lambda_permission" "allow_sqs_invoke_recipe_scraper_lambda" {
+resource "aws_lambda_permission" "allow_sqs_invoke_recipes_scraper_lambda" {
   statement_id  = "AllowSQSInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.recipe_scraper_lambda_function.arn}"
+  function_name = "${aws_lambda_function.recipes_scraper_lambda_function.arn}"
   principal = "sqs.amazonaws.com"
   source_arn = "${aws_sqs_queue.sqs_to_scrape_queue.arn}"
 }
@@ -230,12 +236,16 @@ resource "aws_lambda_permission" "allow_sqs_invoke_recipe_scraper_lambda" {
 # Function loads the JSON data and gets more data from the URL in the JSON and
 # adds to new found data to the original JSON, then uploads this to the staging bucket
 resource "aws_lambda_function" "extract_ingredients_lambda_function" {
-  function_name    = var.extract_ingredients_lambda_function_name
+
+  image_uri        = "${var.lambda_ecr_repository_url}:latest"
   # image_uri        = "${data.aws_ecr_repository.lambda_ecr_repository.repository_url}:latest"
   # image_uri        = data.aws_ecr_repository.lambda_ecr_repository.repository_url
-  image_uri        = "${var.lambda_ecr_repository_url}:latest"
-  role             = aws_iam_role.recipe_pipeline_lambda_role.arn
   package_type     = "Image"
+
+  function_name    = var.extract_ingredients_lambda_function_name
+
+  role             = aws_iam_role.recipe_pipeline_lambda_role.arn
+  
   architectures    = ["x86_64"]
   # architectures    = ["arm64"]
   # handler          = "extract_ingredients_lambda.extract_ingredients_lambda.extract_ingredients_lambda"
@@ -278,7 +288,7 @@ resource "aws_lambda_function" "extract_ingredients_lambda_function" {
 # resource "aws_lambda_permission" "allow_s3_invoke" {
 #   statement_id  = "AllowS3Invoke"
 #   action        = "lambda:InvokeFunction"
-#   function_name = "${aws_lambda_function.recipe_scraper_lambda_function.arn}"
+#   function_name = "${aws_lambda_function.recipes_scraper_lambda_function.arn}"
 #   principal = "s3.amazonaws.com"
 #   source_arn = "${aws_s3_bucket.raw_s3_bucket.arn}"
 # }
@@ -302,10 +312,10 @@ resource "aws_lambda_event_source_mapping" "extract_ingredients_lambda_event_sou
 }
 
 # # Allow the "to scrape" SQS queue to invoke the Recipe Scraper Lambda function
-# resource "aws_lambda_permission" "allow_sqs_invoke_recipe_scraper_lambda" {
+# resource "aws_lambda_permission" "allow_sqs_invoke_recipes_scraper_lambda" {
 #   statement_id  = "AllowSQSInvoke"
 #   action        = "lambda:InvokeFunction"
-#   function_name = "${aws_lambda_function.recipe_scraper_lambda_function.arn}"
+#   function_name = "${aws_lambda_function.recipes_scraper_lambda_function.arn}"
 #   principal = "sqs.amazonaws.com"
 #   source_arn = "${aws_sqs_queue.sqs_to_scrape_queue.arn}"
 # }
@@ -324,19 +334,17 @@ resource "aws_lambda_event_source_mapping" "extract_ingredients_lambda_event_sou
 resource "aws_lambda_function" "recipe_api_lambda" {
 
   s3_bucket        = aws_s3_bucket.recipe_api_lambda_bucket.bucket
-  s3_key           = var.recipe_api_lambda_function_zip_file
+  s3_key           = var.app_lambda_zip_file_name
+  # s3_key           = var.recipe_api_lambda_zip_file_name
   s3_object_version = aws_s3_object.recipe_api_lambda_code.version_id
-  source_code_hash = var.recipe_api_lambda_function_zip_file
-  function_name    = var.recipe_api_lambda_function_name
+  source_code_hash = var.app_lambda_zip_file_name
+  # source_code_hash = var.recipe_api_lambda_zip_file_name
+  
+  function_name    = var.app_lambda_function_name
+  handler            = var.app_lambda_handler
+  # function_name    = var.recipe_api_lambda_function_name
+  # handler          = "app.main.handler"
 
-  # s3_bucket        = aws_s3_bucket.dish_api_lambda_bucket.bucket
-  # s3_key           = var.dish_api_lambda_function_zip_file
-  # s3_object_version = aws_s3_object.dish_api_lambda_code.version_id
-  # source_code_hash = var.dish_api_lambda_function_zip_file
-  # function_name    = var.dish_api_lambda_function_name
-
-  handler          = "app.main.handler"
-  # handler          = "function.name/handler.process_csv_lambda"
   role             = aws_iam_role.recipe_api_lambda_role.arn
   runtime          = "python3.11"
   architectures    = ["x86_64"]

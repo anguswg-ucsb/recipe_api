@@ -68,7 +68,7 @@ resource "aws_sqs_queue_policy" "sqs_to_scrape_queue_policy" {
         Condition = {
           ArnEquals = {
             "aws:SourceArn" = aws_s3_bucket.raw_s3_bucket.arn,
-            "aws:SourceArn" = aws_lambda_function.send_json_lambda_function.arn
+            "aws:SourceArn" = aws_lambda_function.csv_to_json_lambda_function.arn
           }
         }
       }

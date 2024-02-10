@@ -272,7 +272,7 @@ test_data2.csv
 test_data3.csv
 
 sh/test_defaults.sh
-
+sh/export_env_vars.sh
 manifest.json
 
 s3_inventory_example.csv
@@ -283,3 +283,9 @@ s3_inventory_example1.gz.csv
 
 recipes-output-bucket-inventory/*
 recipes-output-bucket-inventory/
+
+cron/
+cron/*
+
+backup/
+backup/*

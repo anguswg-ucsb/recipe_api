@@ -24,18 +24,22 @@ locals {
   # unique_ingred_file_path = "/Users/anguswatters/Desktop/recipes_out/output/unique_ingredients.csv"
 
   # REST API Lambda zip file
-  recipe_api_lambda_zip = "../deploy/app.zip"
+  app_zip = "../deploy/app.zip"
+  # recipe_api_zip = "../deploy/app.zip"
+
+  # recipe_api_lambda_zip = "../deploy/app.zip"
   # dish_api_lambda_zip = "../deploy/app.zip"
   # recipe_api_lambda_zip = "../deploy/lambda_function.zip"
 
   # Data pipeline Lambda zip files
-  chunk_csv_lambda_zip = "../deploy/chunk_csv_lambda.zip"
-  send_json_lambda_zip = "../deploy/send_json_recipes_lambda.zip"
-  recipe_scraper_lambda_zip = "../deploy/recipe_scraper_lambda.zip"
+  chunk_csv_zip = "../deploy/chunk_csv.zip"
+  csv_to_json_zip = "../deploy/csv_to_json.zip"
+  recipes_scraper_zip = "../deploy/recipes_scraper.zip"
 
   # SQS consumer python script
   recipe_script_path = "../sqs_consumer/main.py"
   recipe_backup_script_path = "../sh/backup_db.sh"
+  recipe_restore_script_path = "../sh/restore_db.sh"
 
   # name tag for resources
   name_tag = "recipe-app"
@@ -438,8 +442,8 @@ locals {
 # resource "aws_s3_object" "recipe_api_lambda_code" {
 #   bucket = aws_s3_bucket.recipe_api_lambda_bucket.bucket
 #   key    = "lambda_function.zip"
-#   source = local.recipe_api_lambda_zip
-#   source_hash = filemd5(local.recipe_api_lambda_zip)
+#   source = local.app_zip
+#   source_hash = filemd5(local.app_zip)
 #   tags = {
 #     name = local.name_tag
 #     resource_category = "s3"

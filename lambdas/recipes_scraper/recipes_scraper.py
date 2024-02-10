@@ -3,7 +3,7 @@
     # consumes newly created JSON objects and retrieves additional data for the JSON from the internet.
     # The new data is added the original JSON and is uploaded with a unique ID to another S3 bucket for outputs
     # Designed to be zipped up with its dependencies and provided as a zip file to an AWS Lambda function
-# Usage: python recipe_scraper_lambda.py
+# Usage: python recipes_scraper.py
 # Author: Angus Watters
 
 # general utility libraries
@@ -412,7 +412,7 @@ def process_message(message):
     # return message_body
 
 # lambda handler function
-def recipe_scraper_lambda(event, context):
+def recipes_scraper(event, context):
     message_count = 0
     
     batch_item_failures = []

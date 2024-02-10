@@ -13,7 +13,6 @@ import boto3
 
 # Pandas for data manipulation
 import pandas as pd
-
 # Environment variables
 DB_NAME           = os.environ.get("DB_NAME")
 
@@ -500,84 +499,116 @@ def make_unique_ingredients(input_csv_path, output_csv_path, json_column="ingred
 
 #################################################################
 #################################################################
+
+#### VERSION 1 ####
+# # Primary logic that gets run within main() function
+# # - Download the object from S3, copy it into the database, and delete the local file
+# # - Upsert the new recipes CSV data into the database
+# # - Create unique ingredients dataset from new recipes CSV file (saved locally) and upsert all of the unique ingredients into the database
+# # - Delete the local files
+# def upsert_s3_data_into_db(client, s3_bucket, s3_object_key, local_file_path): 
+#     # Download the object from S3
+#     # msg_body = json.loads(msg["Body"])
+
+#     # s3_bucket = msg_body["Records"][0]["s3"]["bucket"]["name"]
+#     # s3_object_key = msg_body["Records"][0]["s3"]["object"]["key"]
+#     # local_file_path = f"s3_downloads/{s3_key_filename}"
+#     # client = s3
+
+#     try:
+#         s3_obj = client.download_file(Bucket=s3_bucket, Key=s3_object_key, Filename=local_file_path)
+#         print(f"Successfully downloaded {s3_object_key}\n - FROM: {s3_bucket}\n - TO: {local_file_path}")
+#     except Exception as e:
+#         print(f"Exception raised while downloading {s3_object_key} from {s3_bucket}:\n{e}")
+#         return
+    
+#     print(f"Trying to UPSERT {local_file_path} into 'recipe_table' in database...")
+    
+#     print(f"===========================")
+#     print(f"==== ATTEMPT to UPSERT (into recipe_table) ====")
+#     print(f"==== Trying to UPSERT {local_file_path} into 'recipe_table' in database ====")
+#     print(f"===========================")
+
+#     # Try and execute the upsert script
+#     # upsert_csv_into_db(DB_NAME, local_file_path, "recipe_table", "staging_recipe_table")
+#     upsert_recipe_csv_into_db(DB_NAME, local_file_path, "recipe_table", "staging_recipe_table")
+
+#     print(f"----> Succesfully UPSERTED {local_file_path} into 'recipe_table2' database!")
+#     print(f"====" * 8)
+#     print(f"====" * 8)
+#     print(f"==== ATTEMPT to UPSERT (unique_ingredients) ====")
+#     print(f"==== Trying to UPSERT {local_file_path} into 'unique_ingredients' in database ====")
+#     print(f"====" * 8)
+
+#     # Try and execute the upsert script
+#     # upsert_csv_into_db(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
+#     create_and_upsert_unique_ingredients_data(DB_NAME, local_file_path)
+
+#     # execute_upsert_script(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
+
+#     print(f"----> Succesfully UPSERTED {local_file_path} into 'unique_ingredients' database!")
+#     print(f"=====" * 8)
+#     print(f"=====" * 8)
+
+#     ################### ALL GOOD TO GO ##############################
+#     print(f"Sleeping for 3 seconds...")
+
+#     time.sleep(5)
+
+#     print(f"Deleting local file {local_file_path}...")
+
+#     # Delete the local file
+#     subprocess.run(f"rm {local_file_path}", shell=True)
+
+#     return 
+
+#### VERSION 2 ####
 # Primary logic that gets run within main() function
 # - Download the object from S3, copy it into the database, and delete the local file
 # - Upsert the new recipes CSV data into the database
 # - Create unique ingredients dataset from new recipes CSV file (saved locally) and upsert all of the unique ingredients into the database
 # - Delete the local files
-def upsert_s3_data_into_db(client, s3_bucket, s3_object_key, local_file_path): 
-    # Download the object from S3
-    # msg_body = json.loads(msg["Body"])
-
-    # s3_bucket = msg_body["Records"][0]["s3"]["bucket"]["name"]
-    # s3_object_key = msg_body["Records"][0]["s3"]["object"]["key"]
-    # local_file_path = f"s3_downloads/{s3_key_filename}"
-    # client = s3
-
+def upsert_s3_data_into_db(client, s3_bucket, s3_object_key, local_file_path):
     try:
-        s3_obj = client.download_file(Bucket=s3_bucket, Key=s3_object_key, Filename=local_file_path)
-        print(f"Successfully downloaded {s3_object_key}\n - FROM: {s3_bucket}\n - TO: {local_file_path}")
+        # Download the object from S3
+        client.download_file(Bucket=s3_bucket, Key=s3_object_key, Filename=local_file_path)
+        print(f"Successfully downloaded {s3_object_key} from {s3_bucket} to {local_file_path}")
     except Exception as e:
-        print(f"Exception raised while downloading {s3_object_key} from {s3_bucket}:\n{e}")
-        return
+        print(f"ERROR downloading {s3_object_key} from {s3_bucket}: {e}")
+        raise e
     
-    print(f"Trying to UPSERT {local_file_path} into 'recipe_table' in database...")
-    
-    print(f"===========================")
-    print(f"==== ATTEMPT to UPSERT (into recipe_table) ====")
-    print(f"==== Trying to UPSERT {local_file_path} into 'recipe_table' in database ====")
-    print(f"===========================")
+    try:
+        # Upsert the data into the database
+        upsert_recipe_csv_into_db(DB_NAME, local_file_path, "recipe_table", "staging_recipe_table")
+        print(f"Successfully upserted data from {local_file_path} into 'recipe_table'")
+        
+        # Upsert unique ingredients into the database
+        create_and_upsert_unique_ingredients_data(DB_NAME, local_file_path)
+        print(f"Successfully upserted unique ingredients from {local_file_path} into 'unique_ingredients'")
+        
+    except Exception as e:
+        print(f"ERROR upserting data into database: {e}")
+        
+        # Delete the local file
+        if os.path.exists(local_file_path):
+            os.remove(local_file_path)
+            print(f"Deleted local file {local_file_path}")
+            
+        raise e
 
-    # Try and execute the upsert script
-    # upsert_csv_into_db(DB_NAME, local_file_path, "recipe_table", "staging_recipe_table")
-    upsert_recipe_csv_into_db(DB_NAME, local_file_path, "recipe_table", "staging_recipe_table")
+    # If everything succeeded, sleep for a few seconds and then delete the local file
+    time.sleep(3)
 
-    # execute_upsert_script(DB_NAME, local_file_path, "recipe_table", "staging_recipe_table")
-
-    print(f"-----> Succesfully UPSERTED {local_file_path} into 'recipe_table' database!")
-    print(f"=====" * 8)
-
-    print(f"===========================")
-    print(f"==== ATTEMPT to UPSERT (into recipe_table2) ====")
-    print(f"==== Trying to UPSERT {local_file_path} into 'recipe_table2' in database ====")
-    print(f"===========================")
-
-    # Try and execute the upsert script
-    # upsert_csv_into_db(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
-    upsert_recipe_csv_into_db(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
-
-    # execute_upsert_script(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
-
-    print(f"----> Succesfully UPSERTED {local_file_path} into 'recipe_table2' database!")
-    print(f"=====" * 8)
-    print(f"===========================")
-    print(f"==== ATTEMPT to UPSERT (unique_ingredients) ====")
-    print(f"==== Trying to UPSERT {local_file_path} into 'unique_ingredients' in database ====")
-    print(f"===========================")
-
-    # Try and execute the upsert script
-    # upsert_csv_into_db(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
-    create_and_upsert_unique_ingredients_data(DB_NAME, local_file_path)
-
-    # execute_upsert_script(DB_NAME, local_file_path, "recipe_table2", "staging_recipe_table2")
-
-    print(f"----> Succesfully UPSERTED {local_file_path} into 'unique_ingredients' database!")
-    
-    
-    print(f"=====" * 8)
-    print(f"=====" * 8)
-
-    ################### ALL GOOD TO GO ##############################
-    print(f"Sleeping for 3 seconds...")
-
-    time.sleep(5)
-
-    print(f"Deleting local file {local_file_path}...")
+    print(f"Looking to delete local file {local_file_path}...")
 
     # Delete the local file
-    subprocess.run(f"rm {local_file_path}", shell=True)
+    if os.path.exists(local_file_path):
+        os.remove(local_file_path)
+        print(f"Deleted local file {local_file_path}")
 
-    return 
+    print("Processing completed successfully")
+
+    return
 
 # Create a /copy command to copy CSV into a specified database table
 def create_slash_copy_cmd(db_name, table_name, csv_path):
@@ -612,9 +643,10 @@ def main() -> None:
         # Long poll for message on SQS queue
         response = sqs.receive_message(
             QueueUrl=SQS_QUEUE_URL,
+            AttributeNames=['ApproximateReceiveCount'],
             MaxNumberOfMessages=3,
             WaitTimeSeconds=20
-        )
+            )
 
         # Get the messages from the response or default to an empty list
         messages = response.get("Messages", [])
@@ -635,9 +667,21 @@ def main() -> None:
         message_count = 0
 
         for msg in messages:
-            print(f"msg: {msg}")
-            print(f"Processing message {message_count + 1} of {len(messages)}")
 
+            # Get the attributes of the message
+            attributes = msg.get("Attributes", [])
+
+            # Get the approximate receive count from the message attributes, default the number to 0 if not found
+            approx_receive_count = int(attributes.get("ApproximateReceiveCount", 0))
+
+            print(f"=====" * 7)
+            print(f"Processing message {message_count + 1} of {len(messages)}")
+            print(f"Full message: \n > {msg}")
+            print(f"Message Attributes: \n > {attributes}")
+            print(f"Approximate Receive Count: \n > {approx_receive_count}")
+            print(f"=====" * 7)
+
+            # Extract the message body so we can get the S3 bucket and object key from the S3 Event (in the message body)
             msg_body = json.loads(msg["Body"])
 
             if "Records" not in msg_body:
@@ -666,22 +710,27 @@ def main() -> None:
             print(f"Attempting download and insert of S3 CSV...")
 
             # Download the object from S3, copy it into the database, and delete the local file
-            # insert_s3_obj_into_db(s3, s3_bucket, s3_object_key, local_file_path)
-            upsert_s3_data_into_db(s3, s3_bucket, s3_object_key, local_file_path)
+            try:
 
-            print(f"Successfully downloaded and inserted new S3 CSV!")
-
-            # recipes_df = pd.read_csv(local_file_path)
-
-            # # Create unique ingredients dataset
-            # unique_ingreds = create_unique_ingredients(recipes_df, json_column = "ingredient_tags")
+                upsert_s3_data_into_db(s3, s3_bucket, s3_object_key, local_file_path)
+                print(f"Successfully downloaded and inserted new S3 CSV!")
+            except Exception as e:
+                print(f"ERROR during DOWNLOAD or UPSERT, moving to next message: {e}")
+                continue
 
             # TODO: If successful, delete the message from the SQS queue
-            # sqs.delete_message(
-            #     QueueUrl=SQS_QUEUE_URL,
-            #     ReceiptHandle=msg["ReceiptHandle"]
-            # )
-            
+
+            # Try and delete the message from the SQS queue
+            try:
+                # Delete the message from the SQS queue
+                sqs.delete_message(
+                    QueueUrl=SQS_QUEUE_URL,
+                    ReceiptHandle=msg["ReceiptHandle"]
+                )
+                print(f"Message successfully DELETED from SQS queue!")
+            except Exception as e:
+                print(f"ERROR DELETING message from SQS queue: {e}")
+                continue
 
             print(f"====" * 7)
             print(f"====" * 7)

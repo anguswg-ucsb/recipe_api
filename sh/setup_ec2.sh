@@ -61,20 +61,66 @@ sudo mkdir /usr/local/s3_downloads
 sudo chmod -R 755 /usr/local/s3_downloads
 # sudo chmod +x /usr/local/s3_downloads
 
-# # Update ownership and permissions
-# sudo chown -R $USER:$USER /usr/local/s3_downloads
-# sudo chmod -R 755 /usr/local/s3_downloads
+echo "Making usr/local/tmp directory for temporary backup files..."
 
-# CREATE DATABASE
-sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER = postgres ENCODING = 'UTF-8';"
-# sudo -u postgres psql -c "CREATE DATABASE dish_db3 OWNER = postgres ENCODING = 'UTF-8';"
+# Create a custom directory in /usr/local
+sudo mkdir /usr/local/tmp
+
+# grant appropriate permissions to usr/local/tmp directory to write temporary backup files
+sudo chmod -R a+rwx /usr/local/tmp
+# sudo chmod -R 755 /usr/local/tmp
+
+echo "Making shell scripts directory..."
+
+# create a directory for bash scripts
+sudo mkdir /usr/local/sh
+
+echo "Downloading backup database shell script from S3..."
+
+# Download the SQS Consumer Python script from S3
+sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${BACKUP_DB_SCRIPT} /usr/local/sh/${BACKUP_DB_SCRIPT}
+sudo chmod +x /usr/local/sh/${BACKUP_DB_SCRIPT}
+
+# CREATE DATABASE (if it doesn't exist)
+# # if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+# if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep ${DB_NAME}; then
+#     echo "${DB_NAME} already EXISTS"
+# else
+#     echo "${DB_NAME} does NOT exist"
+#     echo "Creating database ${DB_NAME}..."
+#     sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER = postgres ENCODING = 'UTF-8';"
+# fi
+
+# Download restore database shell script from S3
+sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${RESTORE_DB_SCRIPT} /usr/local/sh/${RESTORE_DB_SCRIPT}
+sudo chmod +x /usr/local/sh/${RESTORE_DB_SCRIPT}
+
+echo "Running restore_db.sh script..."
+
+# Run the restore_db.sh script
+sudo /usr/local/sh/${RESTORE_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET} ${AWS_REGION}
+
+# # CREATE DATABASE (if it doesn't exist)
+# if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
+if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep ${DB_NAME}; then
+    echo "${DB_NAME} already EXISTS"
+else
+    echo "${DB_NAME} does NOT exist"
+    echo "Creating database ${DB_NAME}..."
+    sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER = postgres ENCODING = 'UTF-8';"
+fi
+
+# # CREATE DATABASE
+# sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER = postgres ENCODING = 'UTF-8';"
+# # sudo -u postgres psql -c "CREATE DATABASE dish_db3 OWNER = postgres ENCODING = 'UTF-8';"
+
 
 # Create "pgcrypto" extension for generating UUIDs in PostgreSQL DB
 sudo -u postgres psql -d ${DB_NAME} -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 
 # CREATE recipe_table IN DATABASE
 sudo -u postgres psql ${DB_NAME} -c "
-    CREATE TABLE recipe_table (
+    CREATE TABLE IF NOT EXISTS recipe_table (
         dish_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         author TEXT,
         category JSONB,
@@ -97,62 +143,103 @@ sudo -u postgres psql ${DB_NAME} -c "
     );"
 
 
-# CREATE recipe_table IN DATABASE
-sudo -u postgres psql ${DB_NAME} -c "
-    CREATE TABLE recipe_table2 (
-        dish_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-        author TEXT,
-        category JSONB,
-        cook_time INTEGER,
-        cuisine JSONB,
-        description TEXT,
-        host TEXT,
-        image TEXT,
-        ingredient_tags JSONB,
-        ingredients JSONB,
-        instructions JSONB,
-        prep_time INTEGER,
-        ratings FLOAT,
-        sorted_ingredient_tags JSONB,
-        timestamp INTEGER,
-        title TEXT,
-        total_time INTEGER,
-        url TEXT UNIQUE,
-        yields TEXT
-    );"
+# # CREATE recipe_table IN DATABASE
+# sudo -u postgres psql ${DB_NAME} -c "
+#     CREATE TABLE IF NOT EXISTS recipe_table2 (
+#         dish_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+#         author TEXT,
+#         category JSONB,
+#         cook_time INTEGER,
+#         cuisine JSONB,
+#         description TEXT,
+#         host TEXT,
+#         image TEXT,
+#         ingredient_tags JSONB,
+#         ingredients JSONB,
+#         instructions JSONB,
+#         prep_time INTEGER,
+#         ratings FLOAT,
+#         sorted_ingredient_tags JSONB,
+#         timestamp INTEGER,
+#         title TEXT,
+#         total_time INTEGER,
+#         url TEXT UNIQUE,
+#         yields TEXT
+#     );"
 
 # CREATE unique_ingredients_table IN DATABASE
 sudo -u postgres psql ${DB_NAME} -c "
-    CREATE TABLE unique_ingredients_table (
+    CREATE TABLE IF NOT EXISTS unique_ingredients_table (
         ingredient_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
         ingredient TEXT UNIQUE,
         count INTEGER
-    );"
+    );
+    "
 
-echo "Making shell scripts directory..."
+# # Add this query to create an index on the count column
+# CREATE INDEX count_index ON unique_ingredients_table (count DESC);
 
-# create a directory for bash scripts
-sudo mkdir /usr/local/sh
+# echo "Making usr/local/tmp directory for temporary backup files..."
 
-echo "Downloading backup database shell script from S3..."
+# # Create a custom directory in /usr/local
+# sudo mkdir /usr/local/tmp
 
-# Download the SQS Consumer Python script from S3
-sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${BACKUP_DB_SCRIPT} /usr/local/sh/${BACKUP_DB_SCRIPT}
-sudo chmod +x /usr/local/sh/${BACKUP_DB_SCRIPT}
+# # grant appropriate permissions to usr/local/tmp directory to write temporary backup files
+# sudo chmod -R a+rwx /usr/local/tmp
+# # sudo chmod -R 755 /usr/local/tmp
 
-echo "Adding cron job to run every 2 minutes..."
-echo "--> Backing up ${DB_NAME} to ${BACKUP_BUCKET} every 2 minutes"
+# echo "Making shell scripts directory..."
 
+# # create a directory for bash scripts
+# sudo mkdir /usr/local/sh
+
+# echo "Downloading backup database shell script from S3..."
+
+# # Download the SQS Consumer Python script from S3
+# sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${BACKUP_DB_SCRIPT} /usr/local/sh/${BACKUP_DB_SCRIPT}
+# sudo chmod +x /usr/local/sh/${BACKUP_DB_SCRIPT}
+
+# # Download restore database shell script from S3
+# sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${RESTORE_DB_SCRIPT} /usr/local/sh/${RESTORE_DB_SCRIPT}
+# sudo chmod +x /usr/local/sh/${RESTORE_DB_SCRIPT}
+# echo "Running restore_db.sh script..."
+
+# # Run the restore_db.sh script
+# sudo /usr/local/sh/${RESTORE_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET} ${AWS_REGION}
 # # Add cron job to run on the 5th minute of every hour
 # echp "5 */1 * * * /usr/local/sh/${BACKUP_DB_SCRIPT}" ${DB_NAME} ${BACKUP_BUCKET} | crontab -
+# echo "Adding cron job to run every 1 minutes..."
+# echo "*/1 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET}" | crontab -
 
-# # Add cron job to run every 3 minutes
-echo "* /2 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET}"| crontab -
-# echo "* /2 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT}" ${DB_NAME} ${BACKUP_BUCKET} | crontab -
+#################################################
+##### THIS IS THE CORRECT CRON JOB (BELOW) ######
+#################################################
 
-# (crontab -l 2>/dev/null || echo ""; echo "* /2 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET}") | crontab -
-# (crontab -l 2>/dev/null || echo ""; echo "*/5 * * * * /path/to/job -with args") | crontab -
+# echo "Adding backup db cron job to run once every day @ 9:10 AM..."
+# echo "--> cron job backs up ${DB_NAME} to ${BACKUP_BUCKET} once every day at 9:10 AM"
 
+# # Add cron job to run once a day (everyday) at 8:43 AM
+# echo "43 8 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
+
+# # Add cron job to run once a day (everyday) at 9:10 AM
+# echo "10 9 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
+
+# # Add cron job to run once a day (everyday) at 12:00 AM
+# echo "0 0 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
+
+echo "Adding backup DB cron job to run every day at 9:00 AM..."
+echo "--> cron job backs up ${DB_NAME} to ${BACKUP_BUCKET} to run every day at 9:00 AM"
+
+# Add cron job to run every day at 9:00AM
+# echo "0 9 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
+
+# # # Add cron job to run every 300 minutes
+# echo "*/600 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
+
+#################################################
+##### THIS IS THE CORRECT CRON JOB (ABOVE) ######
+#################################################
+# echo "*/1 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
 
 # Create CSV file with headers
 echo "last_modified,size,s3_bucket,s3_object_key,copy_complete" | sudo tee /usr/local/s3_downloads/s3_object_manifest.csv
@@ -181,6 +268,9 @@ echo DB_NAME=\"$DB_NAME\" >> ~/.bashrc
 echo DB_USERNAME=\"$DB_USERNAME\" >> ~/.bashrc
 echo DB_PASSWORD=\"$DB_PASSWORD\" >> ~/.bashrc
 
+echo BACKUP_BUCKET=\"$BACKUP_BUCKET\" >> ~/.bashrc
+echo BACKUP_DB_SCRIPT=\"$BACKUP_DB_SCRIPT\" >> ~/.bashrc
+
 echo S3_DOWNLOADS_PATH=\"$S3_DOWNLOADS_PATH\" >> ~/.bashrc
 echo SQS_QUEUE_URL=\"$SQS_QUEUE_URL\" >> ~/.bashrc
 echo AWS_REGION=\"$AWS_REGION\" >> ~/.bashrc
@@ -202,6 +292,9 @@ echo "DB_NAME=${DB_NAME}" | sudo tee -a /etc/environment
 
 echo "DB_USERNAME=${DB_USERNAME}" | sudo tee -a /etc/environment
 echo "DB_PASSWORD=${DB_PASSWORD}" | sudo tee -a /etc/environment
+
+echo "BACKUP_BUCKET=${BACKUP_BUCKET}" | sudo tee -a /etc/environment
+echo "BACKUP_DB_SCRIPT=${BACKUP_DB_SCRIPT}" | sudo tee -a /etc/environment
 
 echo "S3_DOWNLOADS_PATH=${S3_DOWNLOADS_PATH}" | sudo tee -a /etc/environment
 echo "SQS_QUEUE_URL=${SQS_QUEUE_URL}" | sudo tee -a /etc/environment
@@ -237,7 +330,7 @@ source /etc/environment
 # print statement stating that python script is being executed
 echo "Executing python script..."
 
-# # Run the Python script (SQS Consumer)
+# # # Run the Python script (SQS Consumer)
 # DB_NAME=$DB_NAME \
 # DB_USERNAME=$DB_USERNAME \
 # DB_PASSWORD=$DB_PASSWORD \

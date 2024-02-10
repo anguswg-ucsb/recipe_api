@@ -31,7 +31,7 @@ s3 = boto3.client('s3')
 sqs = boto3.client('sqs')
 
 # lambda handler function
-def chunk_csv_lambda(event, context):
+def chunk_csv(event, context):
 
     print(f"=====================")
     print(f'---->\n Value of event: {event}')

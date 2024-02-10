@@ -94,7 +94,7 @@ resource "aws_s3_bucket_policy" "raw_bucket_policy" {
 #   bucket = aws_s3_bucket.raw_s3_bucket.id
 
 #   lambda_function {
-#     lambda_function_arn = aws_lambda_function.recipe_scraper_lambda_function.arn
+#     lambda_function_arn = aws_lambda_function.recipes_scraper_lambda_function.arn
 #     events              = ["s3:ObjectCreated:*"]
 #     # filter_prefix       = "raw/"
 #     filter_suffix       = ".json"
@@ -201,25 +201,25 @@ resource "aws_s3_bucket" "lambda_s3_bucket" {
 # S3 object for Lambda function code for chunking uploaded CSV files and sending into SQS queue
 resource "aws_s3_object" "chunk_csv_lambda_code_object" {
   bucket = aws_s3_bucket.lambda_s3_bucket.bucket
-  key    = var.chunk_csv_lambda_function_zip_file
-  source = local.chunk_csv_lambda_zip
-  etag   = filemd5(local.chunk_csv_lambda_zip)
+  key    = var.chunk_csv_lambda_zip_file_name
+  source = local.chunk_csv_zip
+  etag   = filemd5(local.chunk_csv_zip)
 }
 
 # S3 object for Lambda function code for chunking uploaded CSV files and sending into SQS queue
-resource "aws_s3_object" "send_json_lambda_code_object" {
+resource "aws_s3_object" "csv_to_json_lambda_code_object" {
   bucket = aws_s3_bucket.lambda_s3_bucket.bucket
-  key    = var.send_json_recipes_lambda_function_zip_file
-  source = local.send_json_lambda_zip
-  etag   = filemd5(local.send_json_lambda_zip)
+  key    = var.csv_to_json_lambda_zip_file_name
+  source = local.csv_to_json_zip
+  etag   = filemd5(local.csv_to_json_zip)
 }
 
 # S3 object for Lambda function code for consuming SQS queue and scraping internet for recipes and storing in S3 bucket
-resource "aws_s3_object" "recipe_scraper_lambda_code_object" {
+resource "aws_s3_object" "recipes_scraper_lambda_code_object" {
   bucket = aws_s3_bucket.lambda_s3_bucket.bucket
-  key    = var.recipe_scraper_lambda_zip_filename
-  source = local.recipe_scraper_lambda_zip
-  etag   = filemd5(local.recipe_scraper_lambda_zip)
+  key    = var.recipes_scraper_lambda_zip_file_name
+  source = local.recipes_scraper_zip
+  etag   = filemd5(local.recipes_scraper_zip)
 }
 
 # ####################################
@@ -326,7 +326,7 @@ resource "aws_s3_bucket_policy" "output_bucket_policy" {
 
 # s3 bucket for raw data
 data "aws_s3_bucket" "backup_s3_bucket" {
-  bucket = var.backup_bucket_name
+  bucket = var.backup_s3_bucket_name
 }
 
 # # s3 bucket to store csv file
@@ -418,19 +418,19 @@ resource "aws_s3_bucket_policy" "backup_bucket_policy" {
   ]
 }
 
-# #######################################
-# # AWS S3 bucket (SQS consumer script) #
-# #######################################
+# -----------------------------------------------
+# # AWS S3 bucket (contains scripts run on EC2) #
+# -----------------------------------------------
 
 # s3 bucket for raw data
 resource "aws_s3_bucket" "script_bucket" {
-  bucket = var.recipe_script_bucket_name
+  bucket = var.recipes_db_scripts_bucket_name
 }
 
 # S3 object for SQS consumer python script that runs on EC2 instance
 resource "aws_s3_object" "script_bucket_object" {
   bucket = aws_s3_bucket.script_bucket.id
-  key    = var.recipe_script_filename
+  key    = var.recipes_consumer_script_filename
   source = local.recipe_script_path
   etag   = filemd5(local.recipe_script_path)
 }
@@ -438,14 +438,22 @@ resource "aws_s3_object" "script_bucket_object" {
 # S3 object for bash script that runs on EC2 instance to backup recipes database
 resource "aws_s3_object" "backup_script_bucket_object" {
   bucket = aws_s3_bucket.script_bucket.id
-  key    = var.recipe_backup_script_filename
+  key    = var.recipes_backup_script_filename
   source = local.recipe_backup_script_path
   etag   = filemd5(local.recipe_backup_script_path)
 }
 
-#################################
-# S3 bucket permissions (STAGE) #
-#################################
+# S3 object for bash script that runs on EC2 instance to restore database from S3 backup 
+resource "aws_s3_object" "restore_script_bucket_object" {
+  bucket = aws_s3_bucket.script_bucket.id
+  key    = var.recipes_restore_script_filename
+  source = local.recipe_restore_script_path
+  etag   = filemd5(local.recipe_restore_script_path)
+}
+
+# -------------------------------------
+# S3 bucket permissions (EC2 scripts) #
+# -------------------------------------
 
 # Enable object versioning on STAGE S3 bucket
 resource "aws_s3_bucket_versioning" "script_s3_bucket_versioning" {
@@ -484,7 +492,7 @@ resource "aws_s3_bucket_acl" "script_s3_bucket_acl" {
 
 data "aws_iam_policy_document" "script_s3_bucket_policy_document" {
   statement {
-    sid = "RecipesStageBucketPolicyFromCurrentAccount"
+    sid = "RecipesScriptsBucketPolicyFromCurrentAccount"
     effect = "Allow"
 
     principals {
@@ -612,9 +620,10 @@ resource "aws_s3_bucket" "recipe_api_lambda_bucket" {
 # s3 object for FAST API REST API for lambda function zip file
 resource "aws_s3_object" "recipe_api_lambda_code" {
   bucket = aws_s3_bucket.recipe_api_lambda_bucket.bucket
-  key    = var.recipe_api_lambda_function_zip_file
-  source = local.recipe_api_lambda_zip
-  etag   = filemd5(local.recipe_api_lambda_zip)
+  key    = var.app_lambda_zip_file_name
+  # key    = var.recipe_api_lambda_zip_file_name
+  source = local.app_zip
+  etag   = filemd5(local.app_zip)
   # source_hash = filemd5(local.api_lambda_zip)
   tags = {
     name = local.name_tag

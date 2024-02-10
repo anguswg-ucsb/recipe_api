@@ -39,7 +39,7 @@ echo "- AWS_PROFILE: $AWS_PROFILE"
 # Export Output S3 Bucket Name, Output S3 inventory bucket and ECR Repository Name as Terraform variables
 export TF_VAR_output_s3_bucket_name="$BUCKET_NAME"
 export TF_VAR_output_s3_inventory_bucket_name="$INVENTORY_BUCKET_NAME"
-export TF_VAR_backup_bucket_name="$BACKUP_BUCKET_NAME"
+export TF_VAR_backup_s3_bucket_name="$BACKUP_BUCKET_NAME"
 export TF_VAR_lambda_ecr_repository_name="$ECR_REPO_NAME"
 
 # export TF_VAR_output_s3_bucket_name="recipes-output-bucket"

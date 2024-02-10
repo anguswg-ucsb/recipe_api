@@ -30,12 +30,13 @@ resource "aws_instance" "ec2_db_instance" {
       # S3_FILE       = var.s3_csv_file_name,
       # S3_UNIQUE_INGREDS_FILE = var.s3_unique_ingred_file_name,
       # MAIN_PY_SCRIPT = data.template_file.main_py.rendered,  # Use the rendered content of main.py
-      SCRIPTS_S3_BUCKET          = var.recipe_script_bucket_name,
-      SQS_CONSUMER_PYTHON_SCRIPT = var.recipe_script_filename,
-      BACKUP_DB_SCRIPT           = var.recipe_backup_script_filename,
+      SCRIPTS_S3_BUCKET          = var.recipes_db_scripts_bucket_name,
+      SQS_CONSUMER_PYTHON_SCRIPT = var.recipes_consumer_script_filename,
+      BACKUP_DB_SCRIPT           = var.recipes_backup_script_filename,
+      RESTORE_DB_SCRIPT          = var.recipes_restore_script_filename,
       SQS_QUEUE_URL              = aws_sqs_queue.sqs_output_queue.url,
       S3_DOWNLOADS_PATH          = var.s3_downloads_path,
-      BACKUO_DOWNLOADS_PATH      = var.backup_downloads_path,
+      BACKUP_DOWNLOADS_PATH      = var.backup_downloads_path,
       AWS_REGION                 = var.aws_region,
   })}")
 
