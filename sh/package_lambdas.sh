@@ -97,14 +97,15 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         
         ########## UNCOMMENT BELOW ##############
 
-        # pip install \
-        #     --platform manylinux2014_x86_64 \
-        #     --target "$PKG_DIR" \
-        #     --implementation cp \
-        #     --python-version 3.11 \
-        #     --only-binary=:all: --upgrade \
-        #     -q \
-        #     -r "$SUBDIR/requirements.txt"
+        pip install \
+            --platform manylinux2014_x86_64 \
+            --target "$PKG_DIR" \
+            --implementation cp \
+            --python-version 3.11 \
+            --only-binary=:all: --upgrade \
+            -q \
+            -r "$SUBDIR/requirements.txt"
+
         ########## UNCOMMENT ABOVE ##############
 
         # check if the current directory is the "app" directory, if not, then find and remove unwanted directories
@@ -244,6 +245,8 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
         fi
 
         echo "> HANDLER: $HANDLER"
+        
+        export "TF_VAR_${DIR_NAME}_lambda_handler"="$HANDLER"
 
         # Check if the script is running on GitHub Actions (RUNNING_ON_GITHUB_ACTION=true), if so
         # then export the environment variables to $GITHUB_ENV so they are made available to
@@ -258,6 +261,9 @@ for SUBDIR in "$BASE_DIR/$APP_DIR"/*; do
 
             # Lambda function ZIP file name
             echo "TF_VAR_$TF_VAR_FUNCTION_ZIP_FILENAME=${DIR_NAME}.zip" >> $GITHUB_ENV
+
+            # Lambda function handler
+            echo "TF_VAR_${DIR_NAME}_handler=$HANDLER" >> $GITHUB_ENV
 
             # Lambda function local ZIP path
             echo "TF_VAR_$TF_VAR_LOCAL_ZIP_PATH=$RELATIVE_ZIP_FILE" >> $GITHUB_ENV

@@ -289,3 +289,5 @@ cron/*
 
 backup/
 backup/*
+
+config.py

@@ -1,4 +1,31 @@
+Content-Type: multipart/mixed; boundary="//"
+MIME-Version: 1.0
+
+--//
+Content-Type: text/cloud-config; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="cloud-config.txt"
+
+#cloud-config
+cloud_final_modules:
+- [scripts-user, always]
+
+--//
+Content-Type: text/x-shellscript; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="userdata.txt"
+
 #!/bin/bash
+
+# Author: Angus Watters
+# Date: 2023-12-15
+# Description: This script is used to setup an EC2 instance for a PostgreSQL database and run a Python script to consume messages from an SQS queue
+
+# ----------------------------------------------------------------------
+# ---- EC2 User data (run ONCE on initial spinup of instance) ----
+# ----------------------------------------------------------------------
 
 # print echo statement for debugging
 echo "The value of S3_BUCKET is: ${S3_BUCKET}"
@@ -11,6 +38,14 @@ echo "The SQS_QUEUE_URL is: ${SQS_QUEUE_URL}"
 
 echo "The value of BACKUP_BUCKET is: ${BACKUP_BUCKET}"
 echo "The value of BACKUP_DB_SCRIPT is: ${BACKUP_DB_SCRIPT}"
+echo "The value of REBOOT_SCRIPT is: ${REBOOT_SCRIPT}"
+
+# path for S3 files to be downloaded to
+S3_DOWNLOADS_PATH="/usr/local/s3_downloads"
+
+# ----------------------------------------
+# ---- Install and update packages ----
+# ----------------------------------------
 
 # update 
 sudo apt-get update -y && sudo apt-get upgrade -y
@@ -31,6 +66,10 @@ echo "Installing boto3..."
 
 # Install boto3
 sudo pip3 install boto3
+
+# ----------------------------------------
+# ---- Install Postgresql ----
+# ----------------------------------------
 
 # Download postgres and postgres-contrib
 sudo apt-get install postgresql postgresql-contrib -y
@@ -54,9 +93,6 @@ sudo systemctl restart postgresql
 # Create a custom directory in /usr/local
 sudo mkdir /usr/local/s3_downloads
 
-# # Create the directory if it doesn't exist
-# sudo mkdir /usr/local/s3_downloads
-
 # Run chmod 755 on the directory to grant appropriate permissions
 sudo chmod -R 755 /usr/local/s3_downloads
 # sudo chmod +x /usr/local/s3_downloads
@@ -77,6 +113,28 @@ sudo mkdir /usr/local/sh
 
 echo "Downloading backup database shell script from S3..."
 
+# -------------------------------------------------------------
+# ---- Download sqs consumer Python script from S3 ----
+# -------------------------------------------------------------
+echo "Making sqs_consumer directory..."
+
+# create a directory for SQS consumer python script
+sudo mkdir /usr/local/sqs_consumer
+
+echo "Downloading SQS Consumer Python script from S3..."
+
+# Download the SQS Consumer Python script from S3
+sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${SQS_CONSUMER_PYTHON_SCRIPT} /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
+sudo chmod +x /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
+
+# -------------------------------------------------------------
+# ---- Download shell scripts from S3 ----
+# -------------------------------------------------------------
+
+# Download shell script that runs when the EC2 instance reboots
+sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${REBOOT_SCRIPT} /usr/local/sh/${REBOOT_SCRIPT}
+sudo chmod +x /usr/local/sh/${REBOOT_SCRIPT}
+
 # Download the SQS Consumer Python script from S3
 sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${BACKUP_DB_SCRIPT} /usr/local/sh/${BACKUP_DB_SCRIPT}
 sudo chmod +x /usr/local/sh/${BACKUP_DB_SCRIPT}
@@ -86,8 +144,7 @@ sudo chmod +x /usr/local/sh/${BACKUP_DB_SCRIPT}
 # if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep ${DB_NAME}; then
 #     echo "${DB_NAME} already EXISTS"
 # else
-#     echo "${DB_NAME} does NOT exist"
-#     echo "Creating database ${DB_NAME}..."
+#     echo "${DB_NAME} does NOT exist --> creating database ${DB_NAME}..."
 #     sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER = postgres ENCODING = 'UTF-8';"
 # fi
 
@@ -113,7 +170,6 @@ fi
 # # CREATE DATABASE
 # sudo -u postgres psql -c "CREATE DATABASE ${DB_NAME} OWNER = postgres ENCODING = 'UTF-8';"
 # # sudo -u postgres psql -c "CREATE DATABASE dish_db3 OWNER = postgres ENCODING = 'UTF-8';"
-
 
 # Create "pgcrypto" extension for generating UUIDs in PostgreSQL DB
 sudo -u postgres psql -d ${DB_NAME} -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
@@ -141,7 +197,6 @@ sudo -u postgres psql ${DB_NAME} -c "
         url TEXT UNIQUE,
         yields TEXT
     );"
-
 
 # # CREATE recipe_table IN DATABASE
 # sudo -u postgres psql ${DB_NAME} -c "
@@ -179,84 +234,38 @@ sudo -u postgres psql ${DB_NAME} -c "
 # # Add this query to create an index on the count column
 # CREATE INDEX count_index ON unique_ingredients_table (count DESC);
 
-# echo "Making usr/local/tmp directory for temporary backup files..."
-
-# # Create a custom directory in /usr/local
-# sudo mkdir /usr/local/tmp
-
-# # grant appropriate permissions to usr/local/tmp directory to write temporary backup files
-# sudo chmod -R a+rwx /usr/local/tmp
-# # sudo chmod -R 755 /usr/local/tmp
-
-# echo "Making shell scripts directory..."
-
-# # create a directory for bash scripts
-# sudo mkdir /usr/local/sh
-
-# echo "Downloading backup database shell script from S3..."
-
-# # Download the SQS Consumer Python script from S3
-# sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${BACKUP_DB_SCRIPT} /usr/local/sh/${BACKUP_DB_SCRIPT}
-# sudo chmod +x /usr/local/sh/${BACKUP_DB_SCRIPT}
-
-# # Download restore database shell script from S3
-# sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${RESTORE_DB_SCRIPT} /usr/local/sh/${RESTORE_DB_SCRIPT}
-# sudo chmod +x /usr/local/sh/${RESTORE_DB_SCRIPT}
-# echo "Running restore_db.sh script..."
-
-# # Run the restore_db.sh script
-# sudo /usr/local/sh/${RESTORE_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET} ${AWS_REGION}
-# # Add cron job to run on the 5th minute of every hour
-# echp "5 */1 * * * /usr/local/sh/${BACKUP_DB_SCRIPT}" ${DB_NAME} ${BACKUP_BUCKET} | crontab -
-# echo "Adding cron job to run every 1 minutes..."
-# echo "*/1 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} ${BACKUP_BUCKET}" | crontab -
-
-#################################################
-##### THIS IS THE CORRECT CRON JOB (BELOW) ######
-#################################################
+# -----------------------
+# ---- Add cronjobs -----
+# -----------------------
+# 1. Cronjob that runs at X interval and creates a pg_dump of postgres database and uploads it to S3 (BACKUP)
+# ---- THIS IS THE CORRECT CRON JOB (BELOW) -----
 
 # echo "Adding backup db cron job to run once every day @ 9:10 AM..."
 # echo "--> cron job backs up ${DB_NAME} to ${BACKUP_BUCKET} once every day at 9:10 AM"
 
-# # Add cron job to run once a day (everyday) at 8:43 AM
-# echo "43 8 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
-
 # # Add cron job to run once a day (everyday) at 9:10 AM
 # echo "10 9 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
-
-# # Add cron job to run once a day (everyday) at 12:00 AM
-# echo "0 0 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
 
 echo "Adding backup DB cron job to run every day at 9:00 AM..."
 echo "--> cron job backs up ${DB_NAME} to ${BACKUP_BUCKET} to run every day at 9:00 AM"
 
-# Add cron job to run every day at 9:00AM
-# echo "0 9 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
-
-# # # Add cron job to run every 300 minutes
-# echo "*/600 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
-
-#################################################
-##### THIS IS THE CORRECT CRON JOB (ABOVE) ######
-#################################################
+# # Add cron job to run every day at 9:00AM
+# echo "0 600 * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
 # echo "*/1 * * * * /usr/local/sh/${BACKUP_DB_SCRIPT} ${DB_NAME} /usr/local/tmp ${BACKUP_BUCKET} 2>&1 | /usr/bin/logger -t backup_db_log" | crontab -
 
-# Create CSV file with headers
-echo "last_modified,size,s3_bucket,s3_object_key,copy_complete" | sudo tee /usr/local/s3_downloads/s3_object_manifest.csv
 
-echo "Making sqs_consumer directory..."
+#######################
 
-# create a directory for SQS consumer python script
-sudo mkdir /usr/local/sqs_consumer
+# echo "Making sqs_consumer directory..."
+# # create a directory for SQS consumer python script
+# sudo mkdir /usr/local/sqs_consumer
+# echo "Downloading SQS Consumer Python script from S3..."
+# # Download the SQS Consumer Python script from S3
+# sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${SQS_CONSUMER_PYTHON_SCRIPT} /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
+# sudo chmod +x /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
 
-echo "Downloading SQS Consumer Python script from S3..."
-
-# Download the SQS Consumer Python script from S3
-sudo aws s3 cp s3://${SCRIPTS_S3_BUCKET}/${SQS_CONSUMER_PYTHON_SCRIPT} /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
-sudo chmod +x /usr/local/sqs_consumer/${SQS_CONSUMER_PYTHON_SCRIPT}
-
-# path for S3 files to be downloaded to
-S3_DOWNLOADS_PATH="/usr/local/s3_downloads"
+# # path for S3 files to be downloaded to
+# S3_DOWNLOADS_PATH="/usr/local/s3_downloads"
 
 # Environment variables need to be exported for main.py (SQS consumer) to use
 # uses tee to write to the file with elevated privileges (sudo tee) also double quotes handle cases where the value contains spaces or special characters.
@@ -270,6 +279,8 @@ echo DB_PASSWORD=\"$DB_PASSWORD\" >> ~/.bashrc
 
 echo BACKUP_BUCKET=\"$BACKUP_BUCKET\" >> ~/.bashrc
 echo BACKUP_DB_SCRIPT=\"$BACKUP_DB_SCRIPT\" >> ~/.bashrc
+echo RESTORE_DB_SCRIPT=\"$RESTORE_DB_SCRIPT\" >> ~/.bashrc
+echo REBOOT_SCRIPT=\"$REBOOT_SCRIPT\" >> ~/.bashrc
 
 echo S3_DOWNLOADS_PATH=\"$S3_DOWNLOADS_PATH\" >> ~/.bashrc
 echo SQS_QUEUE_URL=\"$SQS_QUEUE_URL\" >> ~/.bashrc
@@ -295,6 +306,8 @@ echo "DB_PASSWORD=${DB_PASSWORD}" | sudo tee -a /etc/environment
 
 echo "BACKUP_BUCKET=${BACKUP_BUCKET}" | sudo tee -a /etc/environment
 echo "BACKUP_DB_SCRIPT=${BACKUP_DB_SCRIPT}" | sudo tee -a /etc/environment
+echo "RESTORE_DB_SCRIPT=${RESTORE_DB_SCRIPT}" | sudo tee -a /etc/environment
+echo "REBOOT_SCRIPT=${REBOOT_SCRIPT}" | sudo tee -a /etc/environment
 
 echo "S3_DOWNLOADS_PATH=${S3_DOWNLOADS_PATH}" | sudo tee -a /etc/environment
 echo "SQS_QUEUE_URL=${SQS_QUEUE_URL}" | sudo tee -a /etc/environment
@@ -327,97 +340,38 @@ source ~/.bashrc
 # run source /etc/environment
 source /etc/environment
 
-# print statement stating that python script is being executed
-echo "Executing python script..."
+# ----------------------------------
+# ---- Add reboot cronjob -----
+# ----------------------------------
 
-# # # Run the Python script (SQS Consumer)
-# DB_NAME=$DB_NAME \
+# Cronjob that runs AT REBOOT and restarts the SQS Consumer Python script (REBOOT)
+echo "Adding cron job to restart SQS consumer after instance reboot..."
+
+# # # # Add cron job to source the environment variables and restart the SQS consumer script after an instance reboot
+# echo "@reboot . ~/.bashrc && DB_NAME=$DB_NAME \
+# cd /usr/local/sqs_consumer && \
 # DB_USERNAME=$DB_USERNAME \
 # DB_PASSWORD=$DB_PASSWORD \
 # S3_DOWNLOADS_PATH=$S3_DOWNLOADS_PATH \
 # SQS_QUEUE_URL=$SQS_QUEUE_URL \
 # AWS_REGION=$AWS_REGION \
-# python3 /usr/local/sqs_consumer/main.py
+# python3 /usr/local/sqs_consumer/main.py 2>&1 | /usr/bin/logger -t on_reboot_log" | crontab -
+# # echo "@reboot /usr/local/sh/${REBOOT_SCRIPT} ${DB_NAME} ${DB_USERNAME} ${DB_PASSWORD} ${S3_DOWNLOADS_PATH} ${SQS_QUEUE_URL} ${AWS_REGION} 2>&1 | /usr/bin/logger -t on_reboot_log" | crontab -
 
-####################################################################
-####################################################################
-####################################################################
+# -----------------------------------------------
+# ---- Run SQS consumer python script -----
+# -----------------------------------------------
 
-# # CREATE MAIN RECIPE TABLE IN DATABASE
-# sudo -u postgres psql ${DB_NAME} -c "
-#     CREATE TABLE recipe_table (
-#         dish_id SERIAL PRIMARY KEY,
-#         dish TEXT,
-#         ingredients JSONB,
-#         quantities JSONB,
-#         directions JSONB,
-#         url TEXT,
-#         base_url TEXT,
-#         img TEXT
-#     );"
+# print statement stating that python script is being executed
+echo "Executing python script..."
 
-# # CREATE TABLE IN DATABASE
-# sudo -u postgres psql ${DB_NAME} -c "
-#     CREATE TABLE unique_ingredients_table (
-#         ingredients_id SERIAL PRIMARY KEY,
-#         ingredients TEXT,
-#         count INTEGER
-#     );"
+# # # # Run the Python script (SQS Consumer)
+DB_NAME=$DB_NAME \
+DB_USERNAME=$DB_USERNAME \
+DB_PASSWORD=$DB_PASSWORD \
+S3_DOWNLOADS_PATH=$S3_DOWNLOADS_PATH \
+SQS_QUEUE_URL=$SQS_QUEUE_URL \
+AWS_REGION=$AWS_REGION \
+python3 /usr/local/sqs_consumer/main.py
 
-# # CREATE TABLE IN DATABASE (OLD VERSION)
-# sudo -u postgres psql ${DB_NAME} -c "
-#     CREATE TABLE dish_table (
-#         dish_id SERIAL PRIMARY KEY,
-#         uid TEXT,
-#         dish TEXT,
-#         ingredients JSONB,
-#         split_ingredients JSONB,
-#         quantities JSONB,
-#         directions JSONB
-#     );"
-
-# # create directions table (directions_table)
-# sudo -u postgres psql ${DB_NAME} -c "
-#     CREATE TABLE directions_table (
-#         dish_id SERIAL PRIMARY KEY,
-#         dish TEXT,
-#         directions JSONB,
-#         FOREIGN KEY (dish_id) REFERENCES dish_table(dish_id)
-#     );"
-
-# # create quantities table (quantities_table)
-# sudo -u postgres psql ${DB_NAME} -c "
-#     CREATE TABLE quantities_table (
-#         dish_id SERIAL PRIMARY KEY,
-#         dish TEXT,
-#         quantities JSONB,
-#         FOREIGN KEY (dish_id) REFERENCES dish_table(dish_id)
-#     );"
-
-# # Insert dish_id, dish, DIRECTIONS into directions_table from dish_table
-# sudo -u postgres psql ${DB_NAME} -c "INSERT INTO directions_table (dish_id, dish, directions)
-#     SELECT dish_id, dish, directions
-#     FROM dish_table;"
-
-# # Insert dish_id, dish, QUANTITIES into directions_table from dish_table
-# sudo -u postgres psql ${DB_NAME} -c "INSERT INTO quantities_table (dish_id, dish, quantities)
-#     SELECT dish_id, dish, quantities
-#     FROM dish_table;"
-
-# # Drop split_ingredients, quantities, directions from main dish_table
-# sudo -u postgres psql ${DB_NAME} -c "ALTER TABLE dish_table
-#     DROP COLUMN IF EXISTS quantities,
-#     DROP COLUMN IF EXISTS directions,
-#     DROP COLUMN IF EXISTS url,
-#     DROP COLUMN IF EXISTS base_url,
-#     DROP COLUMN IF EXISTS img;"
-
-# # # Drop split_ingredients, quantities, directions from main dish_table
-# # sudo -u postgres psql ${DB_NAME} -c "ALTER TABLE dish_table
-# #     DROP COLUMN IF EXISTS quantities,
-# #     DROP COLUMN IF EXISTS directions;"
-
-# # sudo service postgresql restart
-# sudo systemctl restart postgresql
-
-####################################################################
+######################################

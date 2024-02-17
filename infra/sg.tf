@@ -4,7 +4,7 @@
 
 # Security group for the EC2 instance
 resource "aws_security_group" "ec2_sg" {
-  name        = "ec2_sg"
+  name        = var.ec2_sg_name
   description = "Security group for the EC2 Postgres DB instance"
   vpc_id      = data.aws_vpc.main_vpc.id
 

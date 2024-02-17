@@ -298,14 +298,14 @@ resource "aws_iam_instance_profile" "ec2_instance_profile" {
 # }
 
 # Create an IAM role for the lambda to assume role
-resource "aws_iam_role" "recipe_api_lambda_role" {
-  name               = "recipe_api_lambda_role"
+resource "aws_iam_role" "recipes_api_lambda_role" {
+  name               = "recipes_api_lambda_role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 
 # Attach necessary policies to the IAM role
-resource "aws_iam_role_policy_attachment" "recipe_api_lambda_role_attachment" {
-  role      = aws_iam_role.recipe_api_lambda_role.name
+resource "aws_iam_role_policy_attachment" "recipes_api_lambda_role_attachment" {
+  role      = aws_iam_role.recipes_api_lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
   # policy_arn = aws_iam_policy.lambda_policy.arn
 }
@@ -333,8 +333,8 @@ resource "aws_iam_policy" "recipe_api_logging_policy" {
 }
 
 # Attach the lambda logging IAM policy to the lambda role
-resource "aws_iam_role_policy_attachment" "recipe_api_lambda_logs" {
-  role       = aws_iam_role.recipe_api_lambda_role.name
+resource "aws_iam_role_policy_attachment" "recipes_api_lambda_logs" {
+  role       = aws_iam_role.recipes_api_lambda_role.name
   policy_arn = aws_iam_policy.recipe_api_logging_policy.arn
 }
 
@@ -378,7 +378,7 @@ resource "aws_iam_policy" "api_gateway_invoke_policy" {
       {
         Effect = "Allow",
         Action = "lambda:InvokeFunction",
-        Resource = aws_lambda_function.recipe_api_lambda.arn,
+        Resource = aws_lambda_function.recipes_api_lambda.arn,
       },
     ],
   })
@@ -387,4 +387,75 @@ resource "aws_iam_policy" "api_gateway_invoke_policy" {
 resource "aws_iam_role_policy_attachment" "api_gateway_invoke_role_policy_attachment" {
   policy_arn = aws_iam_policy.api_gateway_invoke_policy.arn
   role       = aws_iam_role.api_gateway_role.name
+}
+
+# ------------------------------------------------------------------
+# Output S3 bucket replication Role and Policy 
+# ------------------------------------------------------------------
+
+data "aws_iam_policy_document" "replication_assume_role" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "replication" {
+  name               = "bucket-replication-role"
+  assume_role_policy = data.aws_iam_policy_document.replication_assume_role.json
+}
+
+data "aws_iam_policy_document" "replication" {
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "s3:GetReplicationConfiguration",
+      "s3:ListBucket",
+    ]
+
+    resources = [data.aws_s3_bucket.output_s3_bucket.arn]
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "s3:GetObjectVersionForReplication",
+      "s3:GetObjectVersionAcl",
+      "s3:GetObjectVersionTagging",
+    ]
+
+    resources = ["${data.aws_s3_bucket.output_s3_bucket.arn}/*"]
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "s3:ReplicateObject",
+      "s3:ReplicateDelete",
+      "s3:ReplicateTags",
+    ]
+
+    resources = ["${data.aws_s3_bucket.replica_s3_bucket.arn}/*"]
+  }
+}
+
+# Create an IAM policy for the replication role
+resource "aws_iam_policy" "replication" {
+  name   = "bucket-replication-role-policy"
+  policy = data.aws_iam_policy_document.replication.json
+}
+
+# Attach the replication role policy to the replication role
+resource "aws_iam_role_policy_attachment" "replication" {
+  role       = aws_iam_role.replication.name
+  policy_arn = aws_iam_policy.replication.arn
 }

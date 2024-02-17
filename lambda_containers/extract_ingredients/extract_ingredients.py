@@ -637,6 +637,7 @@ def extract_ingredients_lambda(event, context):
 
     return sqs_batch_response
 
+
 # s3_events = [{
 #   "Records": [
 #     {

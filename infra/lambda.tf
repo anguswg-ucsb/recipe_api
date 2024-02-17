@@ -331,21 +331,21 @@ resource "aws_lambda_event_source_mapping" "extract_ingredients_lambda_event_sou
 ###########################
 
 # lambda function to process csv file
-resource "aws_lambda_function" "recipe_api_lambda" {
+resource "aws_lambda_function" "recipes_api_lambda" {
 
-  s3_bucket        = aws_s3_bucket.recipe_api_lambda_bucket.bucket
+  s3_bucket        = aws_s3_bucket.recipes_api_lambda_bucket.bucket
   s3_key           = var.app_lambda_zip_file_name
-  # s3_key           = var.recipe_api_lambda_zip_file_name
-  s3_object_version = aws_s3_object.recipe_api_lambda_code.version_id
+  # s3_key           = var.recipes_api_lambda_zip_file_name
+  s3_object_version = aws_s3_object.recipes_api_lambda_code.version_id
   source_code_hash = var.app_lambda_zip_file_name
-  # source_code_hash = var.recipe_api_lambda_zip_file_name
+  # source_code_hash = var.recipes_api_lambda_zip_file_name
   
   function_name    = var.app_lambda_function_name
   handler            = var.app_lambda_handler
-  # function_name    = var.recipe_api_lambda_function_name
+  # function_name    = var.recipes_api_lambda_function_name
   # handler          = "app.main.handler"
 
-  role             = aws_iam_role.recipe_api_lambda_role.arn
+  role             = aws_iam_role.recipes_api_lambda_role.arn
   runtime          = "python3.11"
   architectures    = ["x86_64"]
   # architectures    = ["arm64"]
@@ -380,11 +380,11 @@ resource "aws_lambda_function" "recipe_api_lambda" {
   depends_on = [
     aws_instance.ec2_db_instance,
     aws_security_group.lambda_sg,
-    aws_s3_bucket.recipe_api_lambda_bucket,
-    aws_s3_object.recipe_api_lambda_code,
+    aws_s3_bucket.recipes_api_lambda_bucket,
+    aws_s3_object.recipes_api_lambda_code,
     # aws_s3_bucket.dish_api_lambda_bucket,
     # aws_s3_object.dish_api_lambda_code,
-    aws_iam_role_policy_attachment.recipe_api_lambda_logs,
+    aws_iam_role_policy_attachment.recipes_api_lambda_logs,
     aws_cloudwatch_log_group.recipe_api_log_group,
   ]
 
@@ -398,11 +398,11 @@ resource "aws_lambda_function" "recipe_api_lambda" {
 resource "aws_lambda_permission" "lambda_api_gw_permission" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.recipe_api_lambda.function_name
+  function_name = aws_lambda_function.recipes_api_lambda.function_name
   principal     = "apigateway.amazonaws.com"
-  # source_arn = "${aws_api_gateway_rest_api.recipe_rest_api.execution_arn}/*/*/*"
+  # source_arn = "${aws_api_gateway_rest_api.recipes_rest_api.execution_arn}/*/*/*"
   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
-  source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipe_rest_api.id}/*/*/*"
-  # source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipe_rest_api.id}/*/${aws_api_gateway_method.recipe_api_any_method.http_method}${aws_api_gateway_resource.recipe_resource.path}"
+  source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipes_rest_api.id}/*/*/*"
+  # source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipes_rest_api.id}/*/${aws_api_gateway_method.recipe_api_any_method.http_method}${aws_api_gateway_resource.recipe_resource.path}"
 
 }

@@ -67,6 +67,6 @@ resource "aws_cloudwatch_log_group" "extract_ingredients_lambda_log_group" {
 # lambda log group
 resource "aws_cloudwatch_log_group" "recipe_api_log_group" {
   name              = "/aws/lambda/${var.app_lambda_function_name}"
-  # name              = "/aws/lambda/${var.recipe_api_lambda_function_name}"
+  # name              = "/aws/lambda/${var.recipes_api_lambda_function_name}"
   retention_in_days = 14
 }

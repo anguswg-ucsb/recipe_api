@@ -1,16 +1,25 @@
 
-#######################################
+# # -------------------------------------------------
+# # S3 bucket for storing the Terraform state files #
+# # -------------------------------------------------
+
+# # S3 bucket for Terraform state files
+# data "aws_s3_bucket" "terraform_state_s3_bucket" {
+#   bucket = var.tfstate_s3_bucket_name
+# }
+
+# -------------------------------------
 # S3 bucket for raw recipes JSON data #
-#######################################
+# -------------------------------------
 
 # s3 bucket for raw data
 resource "aws_s3_bucket" "raw_s3_bucket" {
   bucket = var.raw_s3_bucket_name
 }
 
-###############################
+# -----------------------------
 # S3 bucket permissions (RAW) #
-###############################
+# -----------------------------
 
 # Enable object versioning on RAW S3 bucket
 resource "aws_s3_bucket_versioning" "raw_s3_bucket_versioning" {
@@ -101,18 +110,18 @@ resource "aws_s3_bucket_policy" "raw_bucket_policy" {
 #   }
 # }
 
-#####################
+# -------------------
 # S3 bucket (STAGE) #
-#####################
+# -------------------
 
 # s3 bucket for raw data
 resource "aws_s3_bucket" "stage_s3_bucket" {
   bucket = var.stage_s3_bucket_name
 }
 
-#################################
+# -------------------------------
 # S3 bucket permissions (STAGE) #
-#################################
+# -------------------------------
 
 # Enable object versioning on STAGE S3 bucket
 resource "aws_s3_bucket_versioning" "stage_s3_bucket_versioning" {
@@ -189,9 +198,9 @@ resource "aws_s3_bucket_policy" "stage_bucket_policy" {
   ]
 }
 
-###############################
+# ------------------------------------
 # S3 bucket for lambda function code #
-###############################
+# ------------------------------------
 
 # s3 bucket for lambda code
 resource "aws_s3_bucket" "lambda_s3_bucket" {
@@ -222,12 +231,13 @@ resource "aws_s3_object" "recipes_scraper_lambda_code_object" {
   etag   = filemd5(local.recipes_scraper_zip)
 }
 
-# ####################################
-# # AWS S3 bucket (OUTPUT S3 BUCKET) #
-# ####################################
+# -----------------------------------------------
+# # AWS S3 bucket (OUTPUT S3 BUCKET) 
+# -----------------------------------------------
 
-# s3 bucket for raw data
+# S3 bucket for OUTPUT data (already created data source)
 data "aws_s3_bucket" "output_s3_bucket" {
+  # provider = aws.origin_region
   bucket = var.output_s3_bucket_name
 }
 
@@ -240,17 +250,17 @@ data "aws_s3_bucket" "output_s3_bucket" {
 #   # ]
 # }
 
-#######################################
+# -------------------------------------
 # S3 bucket permissions (Output CSVs) #
-#######################################
+# -------------------------------------
 
-# Enable object versioning on RAW S3 bucket
-resource "aws_s3_bucket_versioning" "output_s3_bucket_versioning" {
-  bucket = data.aws_s3_bucket.output_s3_bucket.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
+# # Enable object versioning on OUTPUT S3 bucket
+# resource "aws_s3_bucket_versioning" "output_s3_bucket_versioning" {
+#   bucket = data.aws_s3_bucket.output_s3_bucket.id
+#   versioning_configuration {
+#     status = "Enabled"
+#   }
+# }
 
 # s3 bucket ownership controls
 resource "aws_s3_bucket_ownership_controls" "output_s3_bucket_ownership_controls" {
@@ -319,10 +329,52 @@ resource "aws_s3_bucket_policy" "output_bucket_policy" {
     aws_s3_bucket_public_access_block.output_s3_public_access_block,
   ]
 }
+# -----------------------------------------------
+# # AWS S3 bucket (Replication S3 BUCKET) 
+# -----------------------------------------------
 
-# ####################################
+# s3 bucket for replicating output data
+data "aws_s3_bucket" "replica_s3_bucket" {
+  # Specify the region of the destination bucket
+  provider = aws.replica_region
+  bucket = var.replica_s3_bucket_name
+}
+
+# # s3 bucket to store csv file
+# resource "aws_s3_bucket" "output_s3_bucket" {
+#   bucket = "dish-recipes-bucket"
+#   #   depends_on = [
+#   #   aws_lambda_function.s3_to_db_lambda,
+#   #   aws_instance.ec2_db_instance,
+#   # ]
+# }
+
+# ---- S3 bucket replica config is handled during build phase and should NOT be managed by Terraform ----
+# # Set up replication between Output S3 bucket and Replica S3 bucket
+# resource "aws_s3_bucket_replication_configuration" "replication_config" {
+  
+#   # # Must have bucket versioning enabled first
+#   # depends_on = [aws_s3_bucket_versioning.source]
+
+#   # Specify the region of the source bucket
+#   provider = aws.origin_region
+  
+#   role   = aws_iam_role.replication.arn
+#   bucket = data.aws_s3_bucket.output_s3_bucket.id
+
+#   rule {
+#     id = var.replication_rule_id
+#     status = "Enabled"
+#     destination {
+#       bucket        = data.aws_s3_bucket.replica_s3_bucket.arn
+#       storage_class = "STANDARD"
+#     }
+#   }
+# }
+
+# ---------------------------------------------
 # # AWS S3 bucket (database backup S3 bucket) #
-# ####################################
+# ---------------------------------------------
 
 # s3 bucket for raw data
 data "aws_s3_bucket" "backup_s3_bucket" {
@@ -338,9 +390,9 @@ data "aws_s3_bucket" "backup_s3_bucket" {
 #   # ]
 # }
 
-#######################################
+# ---------------------------------------------------
 # S3 bucket permissions (database backup S3 bucket) #
-#######################################
+# ---------------------------------------------------
 
 # Enable object versioning on RAW S3 bucket
 resource "aws_s3_bucket_versioning" "backup_s3_bucket_versioning" {
@@ -451,6 +503,14 @@ resource "aws_s3_object" "restore_script_bucket_object" {
   etag   = filemd5(local.recipe_restore_script_path)
 }
 
+# S3 object for bash script that runs when EC2 instance reboots 
+resource "aws_s3_object" "reboot_script_bucket_object" {
+  bucket = aws_s3_bucket.script_bucket.id
+  key    = var.recipes_reboot_script_filename
+  source = local.recipe_reboot_script_path
+  etag   = filemd5(local.recipe_reboot_script_path)
+}
+
 # -------------------------------------
 # S3 bucket permissions (EC2 scripts) #
 # -------------------------------------
@@ -531,9 +591,9 @@ resource "aws_s3_bucket_policy" "script_bucket_policy" {
 }
 
 
-# # ##########################################
+# # # ----------------------------------------
 # # # AWS S3 Object (Upload local CSV files) #
-# # ##########################################
+# # # ----------------------------------------
 
 # # s3 object to store main dish recipes CSV file
 # resource "aws_s3_object" "output_s3_bucket_object" {
@@ -609,7 +669,7 @@ resource "aws_s3_bucket_logging" "output_recipes_logging" {
 ###################################
 
 # s3 bucket for lambda code
-resource "aws_s3_bucket" "recipe_api_lambda_bucket" {
+resource "aws_s3_bucket" "recipes_api_lambda_bucket" {
   bucket = var.recipe_api_bucket_name
   tags = {
     name = local.name_tag
@@ -618,10 +678,10 @@ resource "aws_s3_bucket" "recipe_api_lambda_bucket" {
 }
 
 # s3 object for FAST API REST API for lambda function zip file
-resource "aws_s3_object" "recipe_api_lambda_code" {
-  bucket = aws_s3_bucket.recipe_api_lambda_bucket.bucket
+resource "aws_s3_object" "recipes_api_lambda_code" {
+  bucket = aws_s3_bucket.recipes_api_lambda_bucket.bucket
   key    = var.app_lambda_zip_file_name
-  # key    = var.recipe_api_lambda_zip_file_name
+  # key    = var.recipes_api_lambda_zip_file_name
   source = local.app_zip
   etag   = filemd5(local.app_zip)
   # source_hash = filemd5(local.api_lambda_zip)

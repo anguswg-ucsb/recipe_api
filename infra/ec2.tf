@@ -10,8 +10,8 @@
       # copies the data into the EC2 postgres database COPY COMMAND TO COPY DATA FROM S3 BUCKET
 
 resource "aws_instance" "ec2_db_instance" {
-  ami                  = var.ec2_t2_micro_ami_id
-  instance_type        = "t2.micro"
+  ami                  = var.ec2_ami_id
+  instance_type        = var.ec2_instance_type
   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
   key_name             = aws_key_pair.ssh_key.key_name
   
@@ -34,6 +34,7 @@ resource "aws_instance" "ec2_db_instance" {
       SQS_CONSUMER_PYTHON_SCRIPT = var.recipes_consumer_script_filename,
       BACKUP_DB_SCRIPT           = var.recipes_backup_script_filename,
       RESTORE_DB_SCRIPT          = var.recipes_restore_script_filename,
+      REBOOT_SCRIPT              = var.recipes_reboot_script_filename,
       SQS_QUEUE_URL              = aws_sqs_queue.sqs_output_queue.url,
       S3_DOWNLOADS_PATH          = var.s3_downloads_path,
       BACKUP_DOWNLOADS_PATH      = var.backup_downloads_path,
@@ -94,7 +95,7 @@ resource "aws_key_pair" "ssh_key" {
 # - The script then deletes the copied CSV file from the EC2 instance
 
 # resource "aws_instance" "ec2_db_instance" {
-#   ami           = var.ec2_t2_micro_ami_id
+#   ami           = var.ec2_ami_id
 #   instance_type = "t2.micro"
 #   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
 #   key_name      = aws_key_pair.ssh_key.key_name

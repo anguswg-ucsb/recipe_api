@@ -13,6 +13,13 @@ import boto3
 
 # Pandas for data manipulation
 import pandas as pd
+
+# Logging
+import logging 
+
+logging.basicConfig(level=logging.NOTSET)
+logger = logging.getLogger("sqs-consumer")
+
 # Environment variables
 DB_NAME           = os.environ.get("DB_NAME")
 
@@ -27,20 +34,21 @@ print(f"---->\n Value of DB_NAME: {DB_NAME}")
 print(f"---->\n Value of S3_DOWNLOADS_PATH: {S3_DOWNLOADS_PATH}")
 print(f"---->\n Value of SQS_QUEUE_URL: {SQS_QUEUE_URL}")
 
+logger.info(f"---->\n Value of DB_NAME: {DB_NAME}")
+logger.info(f"---->\n Value of S3_DOWNLOADS_PATH: {S3_DOWNLOADS_PATH}")
+logger.info(f"---->\n Value of SQS_QUEUE_URL: {SQS_QUEUE_URL}")
+
 if DB_USERNAME:
     print(f"---->\n DB_USERNAME WAS FOUND")
+    logger.info(f"---->\n DB_USERNAME WAS FOUND")
 
 if DB_PASSWORD:
     print(f"---->\n DB_PASSWORD WAS FOUND")
+    logger.info(f"---->\n DB_PASSWORD WAS FOUND")
+
 # ######
 # tmp = pd.read_csv('/Users/anguswatters/Downloads/9d01169a86e24fb8867823a6fcd249a6_1705762724.csv')
-# tmp = pd.read_csv('/Users/anguswatters/Downloads/5dbe3e1610654706bd4da237da7be2bd_1705762730.csv')
 
-# tmp
-# len(create_unique_ingredients(tmp))
-
-
-# ######
 # --------------------------------
 # ---- Recipes data functions ----
 # functions for upserting new CSV data into database from an SQS queue
@@ -129,11 +137,11 @@ def upsert_recipe_csv_into_db(db_name, csv_path, target_table, staging_table):
     # COMMIT;
     # """
 
-    print(f"======\n{psql_upsert}")
+    # print(f"======\n{psql_upsert}")
     
     # Build command to upsert new rows into database 
     upsert_command = ['sudo', '-u', 'postgres', 'psql', '-d', db_name, '-c', psql_upsert]
-    print(f"upsert_command:\n - '{' '.join(upsert_command)}'")
+    # print(f"upsert_command:\n - '{' '.join(upsert_command)}'")
     
     # Run the Bash script as a string
     try:
@@ -142,15 +150,28 @@ def upsert_recipe_csv_into_db(db_name, csv_path, target_table, staging_table):
 
         print(f"upsert_output: {upsert_output}")
         print(f"upsert_output.stdout: {upsert_output.stdout}")
+
+        logger.info(f"upsert_output: {upsert_output}")
+        logger.info(f"upsert_output.stdout: {upsert_output.stdout}")
+
         if upsert_output.returncode != 0:
             print(f"ERROR: Upsert command failed with return code {upsert_output.returncode}")
             print(f"stderr: {upsert_output.stderr}")
+            
+            logger.warning(f"ERROR: Upsert command failed with return code {upsert_output.returncode}")
+            logger.warning(f"stderr: {upsert_output.stderr}")
+
         else:
 
             try: 
                 print(f"---" * 5)
                 print(f"------ TRYING TO LOOK AT RECIPES UPDATES COUNTS -------")
                 print(f"---" * 5)
+
+                logger.info(f"---" * 5)
+                logger.info(f"------ TRYING TO LOOK AT RECIPES UPDATES COUNTS -------")
+                logger.info(f"---" * 5)
+
                 # Parse the output to determine inserted and updated rows
                 rows_affected = upsert_output.stdout.strip().split('\n')
                 inserted_rows = [row.split('\t') for row in rows_affected if "INSERT 0 1" in row]
@@ -159,12 +180,20 @@ def upsert_recipe_csv_into_db(db_name, csv_path, target_table, staging_table):
                 print(f"Inserted Rows: {inserted_rows}")
                 print(f"Updated Rows: {updated_rows}")
                 print(f"---" * 5)
+
+                logger.info(f"Inserted Rows: {inserted_rows}")
+                logger.info(f"Updated Rows: {updated_rows}")
+                logger.info(f"---" * 5)
+
             except Exception as e:
                 print(f"Exception raised while parsing upsert output:\n{e}")
+                logger.warning(f"Exception raised while parsing upsert output:\n{e}")
         print(f"=====" * 8)
     except Exception as e:
         print(f"Exception raised while running psql upsert_command\n{e}")
         print(f"ERROR upsert_command:\n - '{' '.join(upsert_command)}'")
+        logger.warning(f"Exception raised while running psql upsert_command\n{e}")
+        logger.warning(f"ERROR upsert_command:\n - '{' '.join(upsert_command)}'")
 
 # --------------------------------------
 # ---- Unique ingredients functions ----
@@ -186,34 +215,45 @@ def create_and_upsert_unique_ingredients_data(db_name, csv_path):
     output_path = os.path.join(dir_path, output_filename)
 
     print(f"CREATING UNIQUE INGREDIENTS...")
+    logger.info(f"CREATING UNIQUE INGREDIENTS...")
 
     # read in CSV into pandas dataframe
     df = pd.read_csv(csv_path)
 
     print(f"--> Calculating unique ingredients in memory...")
+    logger.info(f"--> Calculating unique ingredients in memory...")
 
     # create unique ingredients dataframe
     unique_ingreds = create_unique_ingredients(df)
     
     print(f"--> Number of unique ingredients: {len(unique_ingreds)}")
     print(f"--> Saving unique ingredients CSV file to '{output_path}'...")
-
+    logger.info(f"--> Number of unique ingredients: {len(unique_ingreds)}")
+    logger.info(f"--> Saving unique ingredients CSV file to '{output_path}'...")
+    
     # save unique ingredients dataframe to csv
     unique_ingreds[["ingredient", "count"]].to_csv(output_path, index=False)
 
     print(f"--> UPSERTING unique ingredients into database...")
+    logger.info(f"--> UPSERTING unique ingredients into database...")
     
     # upsert unique ingredients into database
     upsert_unique_ingredients_into_db(db_name, output_path, "unique_ingredients_table", "staging_unique_ingredients_table")
 
     print(f"--> Deleting local file {output_path}...")
-    
+    logger.info(f"--> Deleting local file {output_path}...")
+
     # Delete the local file
     subprocess.run(f"rm {output_path}", shell=True)
 
     print(f"----" * 5)
     print(f"UPSERT of unique ingredients ATTEMPT COMPLETE!")
     print(f"----" * 5)
+
+    logger.info(f"----" * 5)
+    logger.info(f"UPSERT of unique ingredients ATTEMPT COMPLETE!")
+    logger.info(f"----" * 5)
+
 
 # From a local CSV file, extract the count of unique ingredients in the CSV and upsert new rows into a database table
 def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_table):
@@ -265,11 +305,11 @@ def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_t
     COMMIT;
     """
 
-    print(f"======\n{psql_upsert}")
+    # print(f"======\n{psql_upsert}")
     
     # Build command to upsert new rows into database 
     upsert_command = ['sudo', '-u', 'postgres', 'psql', '-d', db_name, '-c', psql_upsert]
-    print(f"upsert_command:\n - '{' '.join(upsert_command)}'")
+    # print(f"upsert_command:\n - '{' '.join(upsert_command)}'")
     
     # Run the Bash script as a string
     try:
@@ -278,14 +318,22 @@ def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_t
 
         print(f"upsert_output: {upsert_output}")
         print(f"upsert_output.stdout: {upsert_output.stdout}")
+        logger.info(f"upsert_output: {upsert_output}")
+        logger.info(f"upsert_output.stdout: {upsert_output.stdout}")
         if upsert_output.returncode != 0:
             print(f"ERROR: Upsert command failed with return code {upsert_output.returncode}")
             print(f"stderr: {upsert_output.stderr}")
+            logger.warning(f"ERROR: Upsert command failed with return code {upsert_output.returncode}")
+            logger.warning(f"stderr: {upsert_output.stderr}")
         else:
             try: 
                 print(f"---" * 5)
                 print(f"------ TRYING TO LOOK AT UPDATING COUNTS -------")
                 print(f"---" * 5)
+                logger.info(f"---" * 5)
+                logger.info(f"------ TRYING TO LOOK AT UPDATING COUNTS -------")
+                logger.info(f"---" * 5)
+
                 # Parse the output to determine inserted and updated rows
                 rows_affected = upsert_output.stdout.strip().split('\n')
                 inserted_rows = [row.split('\t') for row in rows_affected if "INSERT 0 1" in row]
@@ -294,13 +342,19 @@ def upsert_unique_ingredients_into_db(db_name, csv_path, target_table, staging_t
                 print(f"Inserted Rows: {inserted_rows}")
                 print(f"Updated Rows: {updated_rows}")
                 print(f"---" * 5)
+                logger.info(f"Inserted Rows: {inserted_rows}")
+                logger.info(f"Updated Rows: {updated_rows}")
+                logger.info(f"---" * 5)
             except Exception as e:
                 print(f"Exception raised while parsing upsert output:\n{e}")
+                logger.warning(f"Exception raised while parsing upsert output:\n{e}")
 
         print(f"=====" * 8)
     except Exception as e:
         print(f"Exception raised while running psql upsert_command\n{e}")
         print(f"ERROR upsert_command:\n - '{' '.join(upsert_command)}'")
+        logger.warning(f"Exception raised while running psql upsert_command\n{e}")
+        logger.warning(f"ERROR upsert_command:\n - '{' '.join(upsert_command)}'")
 
 #################################################################        
 #################################################################
@@ -640,6 +694,11 @@ def main() -> None:
         print(f"empty_response_count: {empty_response_count}")
         print(f"----------------------------------------")
         
+        logger.info(f"----------------------------------------")
+        logger.info(f"---- STARTING NEW POLLING ITERATION ----")
+        logger.info(f"empty_response_count: {empty_response_count}")
+        logger.info(f"----------------------------------------")
+
         # Long poll for message on SQS queue
         response = sqs.receive_message(
             QueueUrl=SQS_QUEUE_URL,
@@ -654,10 +713,12 @@ def main() -> None:
         if not messages:
             empty_response_count += 1
             print(f"No messages to process. Empty response count: {empty_response_count}. Exiting...")
+            logger.info(f"No messages to process. Empty response count: {empty_response_count}. Exiting...")
             # Increase sleep time with each consecutive empty response
-            # sleep_time = min(2**empty_response_count, 60)
-            sleep_time = min(2*empty_response_count, 60)
+            # sleep_time = min(2**empty_response_count, 900) ultimately this will sleep for 15 minutes if no messages are added to queue
+            sleep_time = min(2**empty_response_count, 90)
             print(f"Sleeping for {sleep_time} seconds...")
+            logger.info(f"Sleeping for {sleep_time} seconds...")
             time.sleep(sleep_time)
             continue
         else:
@@ -681,11 +742,19 @@ def main() -> None:
             print(f"Approximate Receive Count: \n > {approx_receive_count}")
             print(f"=====" * 7)
 
+            logger.info(f"=====" * 7)
+            logger.info(f"Processing message {message_count + 1} of {len(messages)}")
+            logger.info(f"Full message: \n > {msg}")
+            logger.info(f"Message Attributes: \n > {attributes}")
+            logger.info(f"Approximate Receive Count: \n > {approx_receive_count}")
+            logger.info(f"=====" * 7)
+
             # Extract the message body so we can get the S3 bucket and object key from the S3 Event (in the message body)
             msg_body = json.loads(msg["Body"])
 
             if "Records" not in msg_body:
                 print(f"Records key not found in message body. Skipping...")
+                logger.info(f"Records key not found in message body. Skipping...")
                 continue
             # if msg_body["Event"] == "s3:TestEvent":
             #     print(f"s3:TestEvent message. Skipping...")
@@ -709,27 +778,39 @@ def main() -> None:
             print(f"----" * 6)
             print(f"Attempting download and insert of S3 CSV...")
 
+            logger.info(f"----" * 6)
+            logger.info(f"- s3_bucket: {s3_bucket}")
+            logger.info(f"- s3_object_key: {s3_object_key}")
+            logger.info(f"- s3_key_filename: {s3_key_filename}")
+            logger.info(f"- local_file_path: {local_file_path}")
+            logger.info(f"----" * 6)
+            logger.info(f"Attempting download and insert of S3 CSV...")
+
             # Download the object from S3, copy it into the database, and delete the local file
             try:
 
                 upsert_s3_data_into_db(s3, s3_bucket, s3_object_key, local_file_path)
                 print(f"Successfully downloaded and inserted new S3 CSV!")
+                logger.info(f"Successfully downloaded and inserted new S3 CSV!")
             except Exception as e:
                 print(f"ERROR during DOWNLOAD or UPSERT, moving to next message: {e}")
+                logger.warning(f"ERROR during DOWNLOAD or UPSERT, moving to next message: {e}")
                 continue
 
             # TODO: If successful, delete the message from the SQS queue
 
             # Try and delete the message from the SQS queue
             try:
-                # Delete the message from the SQS queue
+                # # Delete the message from the SQS queue
                 sqs.delete_message(
                     QueueUrl=SQS_QUEUE_URL,
                     ReceiptHandle=msg["ReceiptHandle"]
                 )
                 print(f"Message successfully DELETED from SQS queue!")
+                logger.info(f"Message successfully DELETED from SQS queue!")
             except Exception as e:
                 print(f"ERROR DELETING message from SQS queue: {e}")
+                logger.warning(f"ERROR DELETING message from SQS queue: {e}")
                 continue
 
             print(f"====" * 7)

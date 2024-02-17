@@ -9,7 +9,15 @@ terraform {
 
 # cloud provider
 provider "aws" {
+  alias  = "origin_region"
   region = var.aws_region
+  profile = var.aws_profile
+}
+
+# cloud provider for replica region
+provider "aws" {
+  alias   = "replica_region"
+  region  = var.replica_aws_region
   profile = var.aws_profile
 }
 
@@ -27,9 +35,9 @@ locals {
   app_zip = "../deploy/app.zip"
   # recipe_api_zip = "../deploy/app.zip"
 
-  # recipe_api_lambda_zip = "../deploy/app.zip"
+  # recipes_api_lambda_zip = "../deploy/app.zip"
   # dish_api_lambda_zip = "../deploy/app.zip"
-  # recipe_api_lambda_zip = "../deploy/lambda_function.zip"
+  # recipes_api_lambda_zip = "../deploy/lambda_function.zip"
 
   # Data pipeline Lambda zip files
   chunk_csv_zip = "../deploy/chunk_csv.zip"
@@ -40,6 +48,7 @@ locals {
   recipe_script_path = "../sqs_consumer/main.py"
   recipe_backup_script_path = "../sh/backup_db.sh"
   recipe_restore_script_path = "../sh/restore_db.sh"
+  recipe_reboot_script_path = "../sh/on_reboot.sh"
 
   # name tag for resources
   name_tag = "recipe-app"
@@ -93,7 +102,7 @@ locals {
 # # ###############################
 
 # resource "aws_instance" "ec2_db_instance" {
-#   ami           = var.ec2_t2_micro_ami_id
+#   ami           = var.ec2_ami_id
 #   instance_type = "t2.micro"
 #   iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
 #   key_name      = aws_key_pair.ssh_key.key_name
@@ -430,7 +439,7 @@ locals {
 # ###################################
 
 # # s3 bucket for lambda code
-# resource "aws_s3_bucket" "recipe_api_lambda_bucket" {
+# resource "aws_s3_bucket" "recipes_api_lambda_bucket" {
 #   bucket = var.recipe_api_bucket_name
 #   tags = {
 #     name = local.name_tag
@@ -439,8 +448,8 @@ locals {
 # }
 
 # # s3 object for lambda code
-# resource "aws_s3_object" "recipe_api_lambda_code" {
-#   bucket = aws_s3_bucket.recipe_api_lambda_bucket.bucket
+# resource "aws_s3_object" "recipes_api_lambda_code" {
+#   bucket = aws_s3_bucket.recipes_api_lambda_bucket.bucket
 #   key    = "lambda_function.zip"
 #   source = local.app_zip
 #   source_hash = filemd5(local.app_zip)
@@ -487,7 +496,7 @@ locals {
 
 # # lambda log group
 # resource "aws_cloudwatch_log_group" "recipe_api_log_group" {
-#   name              = "/aws/lambda/${var.recipe_api_lambda_function_name}"
+#   name              = "/aws/lambda/${var.recipes_api_lambda_function_name}"
 #   retention_in_days = 14
 # }
 
@@ -510,7 +519,7 @@ locals {
 # }
 
 # # Attach the lambda logging IAM policy to the lambda role
-# resource "aws_iam_role_policy_attachment" "recipe_api_lambda_logs" {
+# resource "aws_iam_role_policy_attachment" "recipes_api_lambda_logs" {
 #   role       = aws_iam_role.lambda_role.name
 #   policy_arn = aws_iam_policy.recipe_api_logging_policy.arn
 # }
@@ -520,10 +529,10 @@ locals {
 # ###########################
 
 # # lambda function to process csv file
-# resource "aws_lambda_function" "recipe_api_lambda" {
-#   s3_bucket        = aws_s3_bucket.recipe_api_lambda_bucket.bucket
+# resource "aws_lambda_function" "recipes_api_lambda" {
+#   s3_bucket        = aws_s3_bucket.recipes_api_lambda_bucket.bucket
 #   s3_key           = "lambda_function.zip"
-#   function_name    = var.recipe_api_lambda_function_name
+#   function_name    = var.recipes_api_lambda_function_name
 #   handler          = "app.main.handler"
 #   # handler          = "function.name/handler.process_csv_lambda"
 #   role             = aws_iam_role.lambda_role.arn
@@ -561,9 +570,9 @@ locals {
 #   depends_on = [
 #     aws_instance.ec2_db_instance,
 #     aws_security_group.lambda_sg,
-#     aws_s3_bucket.recipe_api_lambda_bucket,
-#     aws_s3_object.recipe_api_lambda_code,
-#     aws_iam_role_policy_attachment.recipe_api_lambda_logs,
+#     aws_s3_bucket.recipes_api_lambda_bucket,
+#     aws_s3_object.recipes_api_lambda_code,
+#     aws_iam_role_policy_attachment.recipes_api_lambda_logs,
 #     aws_cloudwatch_log_group.recipe_api_log_group,
 #   ]
 
@@ -608,10 +617,10 @@ locals {
 # resource "aws_lambda_permission" "lambda_api_gw_permission" {
 #   statement_id  = "AllowExecutionFromAPIGateway"
 #   action        = "lambda:InvokeFunction"
-#   function_name = aws_lambda_function.recipe_api_lambda.arn
+#   function_name = aws_lambda_function.recipes_api_lambda.arn
 #   principal =  "apigateway.amazonaws.com"
-#   source_arn = aws_api_gateway_rest_api.recipe_rest_api.execution_arn
-#   #   source_arn = "${aws_api_gateway_rest_api.recipe_rest_api.execution_arn}/*/*/*"
+#   source_arn = aws_api_gateway_rest_api.recipes_rest_api.execution_arn
+#   #   source_arn = "${aws_api_gateway_rest_api.recipes_rest_api.execution_arn}/*/*/*"
 
 # }
 
@@ -656,7 +665,7 @@ locals {
 #       {
 #         Effect = "Allow",
 #         Action = "lambda:InvokeFunction",
-#         Resource = aws_lambda_function.recipe_api_lambda.arn,
+#         Resource = aws_lambda_function.recipes_api_lambda.arn,
 #       },
 #     ],
 #   })
@@ -668,7 +677,7 @@ locals {
 # }
 
 # # Create an API Gateway REST API
-# resource "aws_api_gateway_rest_api" "recipe_rest_api" {
+# resource "aws_api_gateway_rest_api" "recipes_rest_api" {
 #   name        = "dish-rest-api"
 #   description = "Dishes REST API"
 # }
@@ -681,8 +690,8 @@ locals {
 # resource "aws_api_gateway_resource" "recipe_resource" {
 #   path_part   = "{proxy+}"
 #   # path_part   = "resource"
-#   rest_api_id = aws_api_gateway_rest_api.recipe_rest_api.id
-#   parent_id   = aws_api_gateway_rest_api.recipe_rest_api.root_resource_id
+#   rest_api_id = aws_api_gateway_rest_api.recipes_rest_api.id
+#   parent_id   = aws_api_gateway_rest_api.recipes_rest_api.root_resource_id
 # }
 
 # # --------------------------------
@@ -691,7 +700,7 @@ locals {
 # # ANY - METHOD 
 # # Create an ANY method (proxy integration) for the resource
 # resource "aws_api_gateway_method" "recipe_api_any_method" {
-#   rest_api_id   = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id   = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id   = aws_api_gateway_resource.recipe_resource.id
 #   http_method   = "ANY"
 #   authorization = "NONE"
@@ -700,13 +709,13 @@ locals {
 # # ANY - INTEGRATION
 # # Configure the Lambda function integration for ANY METHOD
 # resource "aws_api_gateway_integration" "lambda_any_integration" {
-#   rest_api_id             = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id             = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id             = aws_api_gateway_resource.recipe_resource.id
 #   http_method             = aws_api_gateway_method.recipe_api_any_method.http_method
 #   integration_http_method = "POST"
 #   type                    = "AWS_PROXY"
-#   uri                     = aws_lambda_function.recipe_api_lambda.invoke_arn
-#   # uri = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${var.aws_region}:${var.aws_account_number}:function:${aws_lambda_function.recipe_api_lambda.function_name}/invocations"
+#   uri                     = aws_lambda_function.recipes_api_lambda.invoke_arn
+#   # uri = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${var.aws_region}:${var.aws_account_number}:function:${aws_lambda_function.recipes_api_lambda.function_name}/invocations"
 #   #   request_parameters = {
 #   #   "method.request.path.proxy" = true
 #   # }
@@ -714,7 +723,7 @@ locals {
 
 # # ANY - METHOD RESPONSE
 # resource "aws_api_gateway_method_response" "any_200" {
-#   rest_api_id   = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id   = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id   = aws_api_gateway_resource.recipe_resource.id
 #   http_method   = "ANY"
 #   status_code = "200"
@@ -731,7 +740,7 @@ locals {
 # # ANY - INTEGRATION RESPONSE
 # resource "aws_api_gateway_integration_response" "any_intergration_response" {
 
-#   rest_api_id   = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id   = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id   = aws_api_gateway_resource.recipe_resource.id
 #   http_method   = "ANY"
 #   status_code   = aws_api_gateway_method_response.any_200.status_code
@@ -758,7 +767,7 @@ locals {
 # # GET - METHOD
 # # Create a GET method (proxy integration) for the resource
 # resource "aws_api_gateway_method" "recipe_api_get_method" {
-#   rest_api_id   = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id   = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id   = aws_api_gateway_resource.recipe_resource.id
 #   http_method   = "GET"
 #   authorization = "NONE"
@@ -770,17 +779,17 @@ locals {
 # # GET - INTEGRATION
 # # Configure the Lambda function integration
 # resource "aws_api_gateway_integration" "lambda_get_integration" {
-#   rest_api_id             = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id             = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id             = aws_api_gateway_resource.recipe_resource.id
 #   http_method             = aws_api_gateway_method.recipe_api_get_method.http_method
 #   integration_http_method = "POST"
 #   type                    = "AWS_PROXY"
-#   uri                     = aws_lambda_function.recipe_api_lambda.invoke_arn
+#   uri                     = aws_lambda_function.recipes_api_lambda.invoke_arn
 # }
 
 # # GET - METHOD RESPONSE
 # resource "aws_api_gateway_method_response" "get_200" {
-#   rest_api_id   = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id   = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id   = aws_api_gateway_resource.recipe_resource.id
 #   http_method   = "GET"
 #   status_code = "200"
@@ -796,7 +805,7 @@ locals {
 # # GET - INTEGRATION RESPONSE
 # resource "aws_api_gateway_integration_response" "get_intergration_response" {
 
-#   rest_api_id   = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id   = aws_api_gateway_rest_api.recipes_rest_api.id
 #   resource_id   = aws_api_gateway_resource.recipe_resource.id
 #   http_method   = "GET"
 #   status_code   = aws_api_gateway_method_response.get_200.status_code
@@ -813,10 +822,10 @@ locals {
 # resource "aws_lambda_permission" "lambda_api_gw_permission" {
 #   statement_id  = "AllowExecutionFromAPIGateway"
 #   action        = "lambda:InvokeFunction"
-#   function_name = aws_lambda_function.recipe_api_lambda.arn
+#   function_name = aws_lambda_function.recipes_api_lambda.arn
 #   principal     = "apigateway.amazonaws.com"
 
-#   source_arn = "${aws_api_gateway_rest_api.recipe_rest_api.execution_arn}/*/*/*"
+#   source_arn = "${aws_api_gateway_rest_api.recipes_rest_api.execution_arn}/*/*/*"
 # }
 
 # # ------------------------------------------------
@@ -827,12 +836,12 @@ locals {
 # resource "aws_lambda_permission" "lambda_api_gw_permission" {
 #   statement_id  = "AllowExecutionFromAPIGateway"
 #   action        = "lambda:InvokeFunction"
-#   function_name = aws_lambda_function.recipe_api_lambda.function_name
+#   function_name = aws_lambda_function.recipes_api_lambda.function_name
 #   principal     = "apigateway.amazonaws.com"
-#   # source_arn = "${aws_api_gateway_rest_api.recipe_rest_api.execution_arn}/*/*/*"
+#   # source_arn = "${aws_api_gateway_rest_api.recipes_rest_api.execution_arn}/*/*/*"
 #   # More: http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-control-access-using-iam-policies-to-invoke-api.html
-#   source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipe_rest_api.id}/*/*/*"
-#   # source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipe_rest_api.id}/*/${aws_api_gateway_method.recipe_api_any_method.http_method}${aws_api_gateway_resource.recipe_resource.path}"
+#   source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipes_rest_api.id}/*/*/*"
+#   # source_arn = "arn:aws:execute-api:${var.aws_region}:${var.aws_account_number}:${aws_api_gateway_rest_api.recipes_rest_api.id}/*/${aws_api_gateway_method.recipe_api_any_method.http_method}${aws_api_gateway_resource.recipe_resource.path}"
 
 # }
 
@@ -847,14 +856,14 @@ locals {
 #     # aws_api_gateway_integration.lambda_get_integration
 #     ]
 
-#   rest_api_id = aws_api_gateway_rest_api.recipe_rest_api.id
+#   rest_api_id = aws_api_gateway_rest_api.recipes_rest_api.id
 #   stage_name  = var.api_gw_stage_name
 # }
 
 # # # Create a stage for the deployment
 # # resource "aws_api_gateway_stage" "recipe_api_stage" {
 # #   deployment_id = aws_api_gateway_deployment.recipe_api_deployment.id
-# #   rest_api_id   = aws_api_gateway_rest_api.recipe_rest_api.id
+# #   rest_api_id   = aws_api_gateway_rest_api.recipes_rest_api.id
 # #   stage_name    = var.api_gw_stage_name
 
 # #   # # CloudWatch Logs settings
@@ -863,7 +872,7 @@ locals {
 
 # # # method settings for API gateway and allowing cloudwatch logs/metrics
 # # resource "aws_api_gateway_method_settings" "recipe_api_method_settings" {
-# #   rest_api_id = aws_api_gateway_rest_api.recipe_rest_api.id
+# #   rest_api_id = aws_api_gateway_rest_api.recipes_rest_api.id
 # #   stage_name  = aws_api_gateway_stage.recipe_api_stage.stage_name
 # #   method_path = "*/*"
 
@@ -894,9 +903,9 @@ locals {
 
 # # Output the URL of the API Gateway deployment
 # output "api_gateway_rest_api_id" {
-#   value = aws_api_gateway_rest_api.recipe_rest_api.id
+#   value = aws_api_gateway_rest_api.recipes_rest_api.id
 # }
 
 # output "api_gateway_rest_api_execution_arn_custom_ALL" {
-#   value = "${aws_api_gateway_rest_api.recipe_rest_api.execution_arn}/*/*/*"
+#   value = "${aws_api_gateway_rest_api.recipes_rest_api.execution_arn}/*/*/*"
 # }

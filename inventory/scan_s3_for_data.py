@@ -17,36 +17,7 @@ s3_manifest = pd.read_csv(PATH_TO_S3_MANIFEST)
 # then copy the files in the list to the new bucket
 # then update the manifest with the new files and set the copy_complete to True
 # then delete the file from local storage
-
 # if the file is in the manifest and the copy_complete is True, then delete the file from local storage
-
-# def process_and_update_manifest(manifest_df, new_files, s3_bucket):
-#     # Logic to process files and update manifest
-#     for file_name in new_files:
-#         # Check if the file is already in the manifest
-#         if file_name not in manifest_df['s3_object_key'].tolist():
-#             # Copy file to new bucket and update manifest
-#             print(f"Copying file {file_name} to new bucket...")
-#             # Add logic to copy the file to the new bucket
-#             # ...
-
-#             # Update manifest
-#             manifest_df = manifest_df.append({
-#                 'last_modified': '',  # Update with actual last_modified value
-#                 'size': '',           # Update with actual size value
-#                 's3_bucket': s3_bucket,
-#                 's3_object_key': file_name,  # Update with actual s3_object_key value
-#                 'copy_complete': False
-#             }, ignore_index=True)
-
-#             print(f"File {file_name} copied and manifest updated.")
-
-#             # Delete local file
-#             print(f"Deleting local file {file_name}...")
-#             # Add logic to delete the local file
-#             # ...
-
-#     return manifest_df
 
 def process_and_update_manifest(manifest_df, recent_obj_df, s3_bucket):
     # Logic to process files and update manifest
@@ -189,20 +160,6 @@ for index, row in files_to_process.iterrows():
     updated_manifest.to_csv(PATH_TO_S3_MANIFEST, index=False)    
 
     # if the IMPORT/COPY command works, delete the local file and update the file manifest "copy_complete" column to True
-
-
-
-
-
-# # Check if the object is in the manifest and if its copy_complete is True
-# # If it's not in the manifest, then add the file name to a list
-# new_files = [file_name for file_name in daily_objects["s3_object_key"].tolist() if file_name not in s3_manifest['s3_object_key'].tolist()]
-
-
-# # Process and update manifest for new files
-# if new_files:
-#     updated_manifest = process_and_update_manifest(s3_manifest, new_files, S3_BUCKET)
-
 
 
 # Check if the object is in the manifest and if its copy_complete is True
