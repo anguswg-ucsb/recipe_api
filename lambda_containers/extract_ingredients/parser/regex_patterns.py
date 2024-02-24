@@ -29,6 +29,12 @@ FRACTION_PATTERN = re.compile(r'\d*\s*/\s*\d+')
 # a forward slash then another number.
 MULTI_PART_FRACTIONS_PATTERN = re.compile(r"(\d*\s*\d/\d+)")
 
+# Updated regex pattern for multi-part fractions that includes "and" or "&" in between the numbers
+MULTI_PART_FRACTIONS_PATTERN_AND = re.compile(r"(\d*\s*(?:and|&)?\s*\d/\d+)")
+
+# Updated regex pattern for multi-part fractions
+MULTI_PART_FRACTIONS_PATTERN = re.compile(r"(\d*\s*(?:and|&)?\s*\d/\d+)")
+
 # Match pattern where there is a number followed by 0+ spaces and then another number or a fraction
 NUM_SPACE_FRACTION_PATTERN = re.compile(r'\d+\s+\d*\s*/\s*\d+')
 
@@ -60,8 +66,11 @@ UNITS_PARENTHESES_QUANTITY_PATTERN = re.compile(r"([a-zA-Z]+)\((\d+)")
 
 
 # List of tuples containing variable name and corresponding compiled regex pattern
-pattern_list = [('UNITS_PATTERN', UNITS_PATTERN),
+pattern_list = [
+    ('UNITS', UNITS),
+    ('UNITS_PATTERN', UNITS_PATTERN),
     # ('SINGLE_NUMBER_THEN_UNIT_PATTERN', SINGLE_NUMBER_THEN_UNIT_PATTERN),
+    ('UNICODE_FRACTIONS', UNICODE_FRACTIONS),
     ('NUMBER_WORDS_REGEX_MAP', NUMBER_WORDS_REGEX_MAP),            
     ('ANY_NUMBER_THEN_UNIT_PATTERN', ANY_NUMBER_THEN_UNIT_PATTERN),
     ('UNIT_THEN_ANY_NUMBER_PATTERN', UNIT_THEN_ANY_NUMBER_PATTERN),
@@ -70,6 +79,7 @@ pattern_list = [('UNITS_PATTERN', UNITS_PATTERN),
     ('FRACTION_PATTERN', FRACTION_PATTERN),
     ('MULTI_PART_FRACTIONS_PATTERN', MULTI_PART_FRACTIONS_PATTERN),
     ('NUM_SPACE_FRACTION_PATTERN', NUM_SPACE_FRACTION_PATTERN),
+    ('MULTI_PART_FRACTIONS_PATTERN_AND', MULTI_PART_FRACTIONS_PATTERN_AND),
     ('NUM_AND_FRACTION_PATTERN', NUM_AND_FRACTION_PATTERN),
     ('RANGE_WITH_TO_OR_PATTERN', RANGE_WITH_TO_OR_PATTERN),
     ('BETWEEN_NUM_AND_NUM_PATTERN', BETWEEN_NUM_AND_NUM_PATTERN),
@@ -110,8 +120,8 @@ class RegexPatterns:
             matches[name] = re.findall(pattern, input_string)
         return matches
     
-# Instantiate the RegexPatterns class with the list of patterns
-regex_patterns = RegexPatterns(pattern_list)
+# # Instantiate the RegexPatterns class with the list of patterns
+# regex_patterns = RegexPatterns(pattern_list)
 # regex_pat = RegexPatterns(pattern_list)
 
 # for name, pattern in regex_patterns.patterns.items():

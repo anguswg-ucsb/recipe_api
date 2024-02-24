@@ -1,6 +1,7 @@
 import re
 from typing import List, Dict, Any, Union, Tuple, optional
 from fractions import Fraction
+from html import unescape
 
 # from regex_patterns import regex_patterns
 # from regex_patterns import pattern_list, RegexPatterns
@@ -52,6 +53,17 @@ class RecipeParser:
                 print(f"- Found {word} in ingredient. Replacing with {regex_data[0]}")
             self.parsed_ingredient = pattern.sub(regex_data[0], self.parsed_ingredient)
 
+    def _clean_html_and_unicode(self) -> None:
+        """Unescape fractions from HTML code coded fractions to unicode fractions."""
+
+        # Unescape HTML
+        self.parsed_ingredient = unescape(self.parsed_ingredient)
+        # regex_patterns.UNICODE_FRACTIONS
+        # Replace unicode fractions with their decimal equivalents
+        for unicode_fraction, decimal_fraction in self.regex_patterns.UNICODE_FRACTIONS.items():
+            self.parsed_ingredient = self.parsed_ingredient.replace(unicode_fraction, decimal_fraction)
+
+
     def _parse_fractions(self):
         """
         Replace unicode and standard fractions with their decimal equivalents in the parsed ingredient.
@@ -77,7 +89,7 @@ class RecipeParser:
         # print(updated_ingredient)
 
         # finditer() method
-        fractions = re.finditer(regex_patterns.MULTI_PART_FRACTIONS_PATTERN, self.parsed_ingredient)
+        fractions = re.finditer(regex_patterns.MULTI_PART_FRACTIONS_PATTERN_AND, self.parsed_ingredient)
 
         # Replace fractions in the original string with their sum based on match indices
         # updated_ingredient = self.parsed_ingredient
@@ -90,23 +102,23 @@ class RecipeParser:
             end_index = match.end() + offset
             matched_fraction = match.group()
 
+            # remove "and" and "&" from the matched fraction
+            matched_fraction = matched_fraction.replace("and", " ").replace("&", " ")
+
             # Parse the matched fraction, make sure it's in the correct format, to be able to be summed
-            parsed_fraction = parse_mixed_fraction(matched_fraction)
+            parsed_fraction = self._parse_mixed_fraction(matched_fraction)
 
             # Replace the matched fraction with the sum of the parsed fraction
-            sum_fraction = sum_parsed_fractions(parsed_fraction)
+            sum_fraction = self._sum_parsed_fractions(parsed_fraction)
 
             # Insert the sum of the fraction into the updated ingredient string
             # updated_ingredient = updated_ingredient[:start_index] + str(sum_fraction) + updated_ingredient[end_index:]
-            self.parsed_ingredient = self.parsed_ingredient[:start_index] + str(sum_fraction) + self.parsed_ingredient[end_index:]
+            self.parsed_ingredient = self.parsed_ingredient[:start_index] + " " + str(sum_fraction) + self.parsed_ingredient[end_index:]
 
             # Update the offset to account for the difference in length between the matched fraction and the sum of the fraction
             offset += len(str(sum_fraction)) - len(matched_fraction)
 
-
-
-
-    def _parse_mixed_fraction(fraction_str: str) -> list:
+    def _parse_mixed_fraction(self, fraction_str: str) -> list:
         # Remove whitespace to the left and right of a slash
         cleaned_fractions = re.sub(r'\s*/\s*', '/', fraction_str)
 
@@ -124,7 +136,7 @@ class RecipeParser:
             # If no match found, split the string based on space and return
             return cleaned_fractions.split()
 
-    def _sum_parsed_fractions(fraction_list: list, truncate = 3) -> float:
+    def _sum_parsed_fractions(self, fraction_list: list, truncate = 3) -> float:
         
         total = 0
         for i in fraction_list:
@@ -148,7 +160,13 @@ class RecipeParser:
         self._parse_number_words()
 
         print(f" > AFTER: \n Ingredient: {self.ingredient} \n Parsed Ingredient: {self.parsed_ingredient} \n")
+        print(f"Parsing HTML and unicode...")
 
+        # Clean HTML and unicode fractions
+        print(f" > BEFORE: \n Ingredient: {self.ingredient} \n Parsed Ingredient: {self.parsed_ingredient} \n")
+
+        self._clean_html_and_unicode()
+        print(f" > AFTER: \n Ingredient: {self.ingredient} \n Parsed Ingredient: {self.parsed_ingredient} \n")
         print(f"Parsing fractions...")
         print(f" > BEFORE: \n Ingredient: {self.ingredient} \n Parsed Ingredient: {self.parsed_ingredient} \n")
         self._parse_fractions()
@@ -158,6 +176,35 @@ class RecipeParser:
         print(f'---> Returning parsed ingredient: {self.parsed_ingredient} \n')
         return self.parsed_ingredient
     
+#################### Test the RecipeParser class ####################
+ingredient_strings = [
+    "\u215b tbsp sugar",
+    "two to three tablespoons ~ of sugar, 1 2/3 tablespoons of water",
+    "3/4 tsp salt",
+    "1 1/2 cups diced tomatoes",
+    "1 2/3 tablespoons of lettuce",
+    "1 and 3/3 tablespoons of lettuce",
+    "1/4 lb bacon, diced",
+    "1/2 cup breadcrumbs",
+    "1/4 cup grated Parmesan cheese",
+    "warmed butter (1 - 2 sticks)",
+    "honey, 1/2 tbsp of sugar",
+    "- butter (1 - 2 sticks)",
+    "peanut butter, 1-3 tbsp",
+    "between 1/2 and 3/4 cups of sugar",
+    "1/3 pound of raw shrimp, peeled and deveined",
+    "1/4 cup of grated Parmesan cheese",
+    ]
+
+ingredient = ingredient_strings[0]
+regex_patterns = RegexPatterns(pattern_list)
+regex_patterns.patterns.keys()
+parser = RecipeParser(ingredient, regex_patterns)
+parser.parse()
+############################
+
+
+
 F_PATTERN = r'([+-]?[^+-]+)'
 import re
 from fractions import Fraction
@@ -328,7 +375,7 @@ ingredient_strings = [
     "- butter (1 - 2 sticks)",
     "peanut butter, 1-3 tbsp",
     "between 1/2 and 3/4 cups of sugar",
-    "1/3 pound of raw shrimp, peeled and deveined",
+    "1/3 pound of raw shrimp, or 1/4 peeled and deveined",
     "1/4 cup of grated Parmesan cheese",
     ]
 
@@ -342,6 +389,8 @@ for i in parsed_output:
     print(i)
     print(f"\n")
 
+parser = RecipeParser(ingredient, regex_patterns)
+ingredient = ingredient_strings[1]
 parser = RecipeParser(ingredient, regex_patterns)
 
 parser.ingredient
