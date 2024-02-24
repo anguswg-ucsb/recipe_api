@@ -291,3 +291,12 @@ backup/
 backup/*
 
 config.py
+
+lambda_containers/model/
+lambda_containers/model/*
+
+model/
+model/*
+model/flan-t5-large
+model/flan-t5-large/
+model/flan-t5-large/*
