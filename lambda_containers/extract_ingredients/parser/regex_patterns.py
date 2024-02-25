@@ -14,8 +14,10 @@ from lambda_containers.extract_ingredients.parser.static_values import NUMBER_WO
 # Step 5: Remove trailing periods from units and replace all units with their standard abbreviations
 # Step 6: Seperate any part of the string that is wrapped in PARENTHESES and treat this as its own string
 
-# matches numbers with a hyphen in between them
-QUANTITY_RANGE_PATTERN = re.compile(r"\d+\s*[\-]\d+")
+# matches numbers with a hyphen in between them]
+QUANTITY_RANGE_PATTERN = re.compile(r"\d+\s*(?:\s*-\s*)+\d+")
+# QUANTITY_RANGE_PATTERN = re.compile(r"\d+\s*-\s*\d+")
+# QUANTITY_RANGE_PATTERN = re.compile(r"\d+\s*[\-]\d+")
 
 # match situation where there is a number followed by a space and then a word and then a number or a fraction
 QUANTITY_WORD_PATTERN = re.compile(r"(\d+\s\w+\s\d+/\d+|\d+\s\w+)")
@@ -42,11 +44,16 @@ NUM_SPACE_FRACTION_PATTERN = re.compile(r'\d+\s+\d*\s*/\s*\d+')
 NUM_AND_FRACTION_PATTERN = re.compile(r'\d+\s+(?:and|&)\s+\d*\s*/\s*\d+')
 
 # match pattern where there is a number followed by a space and then a word and or a "to" then a number or a fraction
-RANGE_WITH_TO_OR_PATTERN = re.compile(r'(\d+(?:\.\d+)?)\s*(?:-\s*|\b(?:to|or)\s+)\s*(\d+(?:\.\d+)?)')
+RANGE_WITH_TO_OR_PATTERN = re.compile(r'\b\s*((?:\d*\s*/\s*\d+|\d+)\s+(?:to|or)\s+(?:\d*\s*/\s*\d+|\d+))')
+# RANGE_WITH_TO_OR_PATTERN = re.compile(r'(\d+(?:\.\d+)?)\s*(?:-\s*|\b(?:to|or)\s+)\s*(\d+(?:\.\d+)?)')
+# RANGE_WITH_TO_OR_PATTERN2 = re.compile(r'\b\s*((?:\d*\s*/\s*\d+|\d+)\s+(?:to|or)\s+(?:\d*\s*/\s*\d+|\d+))')
 
 # Regex pattern for matching "between" followed by a number or a fraction, then "and" or "&", 
 # and then another number or a fraction
-BETWEEN_NUM_AND_NUM_PATTERN = re.compile(r'between\s+(\d*\s*/\s*\d+|\d+)\s+(?:and|&)\s+(\d*\s*/\s*\d+|\d+)')
+BETWEEN_NUM_AND_NUM_PATTERN = re.compile(r'\bbetween\b\s*((?:\d*\s*/\s*\d+|\d+)\s+(?:and|&)\s+(?:\d*\s*/\s*\d+|\d+))')
+# BETWEEN_NUM_AND_NUM_PATTERN = re.compile(r'between\s+(\d*\s*/\s*\d+|\d+)\s+(?:and|&)\s+(\d*\s*/\s*\d+|\d+)')
+
+# tmp ='i like to eat 1-2 oz with cats and 1 - 2 ft of snow and 1 -- 45 inches, cats do between 1 and 5 digs'
 
 # Regex to match number (QUANTITY) then unit abbreviation (single string as unit)
 QUANTITY_THEN_UNIT_ABBR_PATTERN = re.compile(r"(\d)\-?([a-zA-Z])") # 3g = 3 g
@@ -64,6 +71,18 @@ UNITS_COMMA_QUANTITY_PATTERN = re.compile(r"([a-zA-Z]+),(\d+)")
 UNITS_SLASH_QUANTITY_PATTERN = re.compile(r"([a-zA-Z]+)/(\d+)")
 UNITS_PARENTHESES_QUANTITY_PATTERN = re.compile(r"([a-zA-Z]+)\((\d+)")
 
+# Regex pattern to match ranges where the unit appears after both quantities e.g.
+# 100 g - 200 g. This assumes the quantites and units have already been seperated
+# by a single space and that all number are decimals.
+# This regex matches: <quantity> <unit> - <quantity> <unit>, returning
+# the full match and each quantity and unit as capture groups.
+DUPE_UNIT_RANGES_PATTERN = re.compile(
+    r"(([\d\.]+)\s([a-zA-Z]+)\s\-\s([\d\.]+)\s([a-zA-Z]+))", re.I
+)
+
+# Regex pattern to match a decimal number followed by an "x" followed by a space
+# e.g. 0.5 x, 1 x, 2 x. The number is captured in a capture group.
+QUANTITY_X_PATTERN = re.compile(r"([\d\.]+)\s[xX]\s*")
 
 # List of tuples containing variable name and corresponding compiled regex pattern
 pattern_list = [
