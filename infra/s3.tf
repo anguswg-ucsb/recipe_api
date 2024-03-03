@@ -198,6 +198,93 @@ resource "aws_s3_bucket_policy" "stage_bucket_policy" {
   ]
 }
 
+# -----------------------------
+# S3 bucket (Raw HTML bucket) #
+# -----------------------------
+
+# s3 bucket for raw data
+resource "aws_s3_bucket" "stage_s3_bucket" {
+  bucket = var.stage_s3_bucket_name
+}
+
+# -------------------------------
+# S3 bucket permissions (STAGE) #
+# -------------------------------
+
+# Enable object versioning on STAGE S3 bucket
+resource "aws_s3_bucket_versioning" "stage_s3_bucket_versioning" {
+  bucket = aws_s3_bucket.stage_s3_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# s3 bucket ownership controls
+resource "aws_s3_bucket_ownership_controls" "stage_s3_bucket_ownership_controls" {
+  bucket = aws_s3_bucket.stage_s3_bucket.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+# s3 bucket public access block
+resource "aws_s3_bucket_public_access_block" "stage_s3_public_access_block" {
+  bucket = aws_s3_bucket.stage_s3_bucket.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_acl" "stage_s3_bucket_acl" {
+  depends_on = [
+    aws_s3_bucket_ownership_controls.stage_s3_bucket_ownership_controls,
+    aws_s3_bucket_public_access_block.stage_s3_public_access_block,
+  ]
+
+  bucket = aws_s3_bucket.stage_s3_bucket.id
+  acl    = "private"
+}
+
+data "aws_iam_policy_document" "stage_s3_bucket_policy_document" {
+  statement {
+    sid = "RecipesStageBucketPolicyFromCurrentAccount"
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = ["*"]
+    }
+
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:ListBucket"
+    ]
+
+    resources = [
+      aws_s3_bucket.stage_s3_bucket.arn,
+      "${aws_s3_bucket.stage_s3_bucket.arn}/*"
+    ]
+
+    condition {
+      test = "StringEquals"
+      variable = "aws:PrincipalAccount"
+      values = [var.aws_account_number]
+    }
+  }
+}
+
+# s3 bucket policy to allow public access
+resource "aws_s3_bucket_policy" "stage_bucket_policy" {
+  bucket = aws_s3_bucket.stage_s3_bucket.id
+  policy = data.aws_iam_policy_document.stage_s3_bucket_policy_document.json
+  depends_on = [
+    aws_s3_bucket_acl.stage_s3_bucket_acl,
+    aws_s3_bucket_ownership_controls.stage_s3_bucket_ownership_controls,
+    aws_s3_bucket_public_access_block.stage_s3_public_access_block,
+  ]
+}
 # ------------------------------------
 # S3 bucket for lambda function code #
 # ------------------------------------
@@ -619,9 +706,9 @@ resource "aws_s3_bucket_policy" "script_bucket_policy" {
 #   # ]
 # }
 
-# ###########################################################
+# -----------------------------------------------------------
 # # AWS S3 logging bucket (Logging bucketg for OUTPUT CSVs) #
-# ###########################################################
+# -----------------------------------------------------------
 
 # create s3 bucket for storing logs for dish recipes bucket
 resource "aws_s3_bucket" "output_recipes_log_bucket" {
@@ -664,9 +751,9 @@ resource "aws_s3_bucket_logging" "output_recipes_logging" {
   target_prefix = "log/"
 }
 
-###################################
+# -----------------------------------------------------------
 # Upload FastAPI Lambda zip to S3 #
-###################################
+# -----------------------------------------------------------
 
 # s3 bucket for lambda code
 resource "aws_s3_bucket" "recipes_api_lambda_bucket" {
@@ -691,10 +778,9 @@ resource "aws_s3_object" "recipes_api_lambda_code" {
   }
 }
 
-
-# # ####################################################
+# -----------------------------------------------------------
 # # # AWS S3 logging bucket (dish-recipes-bucket logs) #
-# # ####################################################
+# -----------------------------------------------------------
 
 # # create s3 bucket for storing logs for dish recipes bucket
 # resource "aws_s3_bucket" "dish_recipes_log_bucket" {

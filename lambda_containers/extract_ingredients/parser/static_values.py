@@ -38,7 +38,7 @@ for word, value in NUMBER_WORDS.items():
     NUMBER_WORDS_REGEX_MAP[word] = [str(value), re.compile(r'\b' + word + r'\b', re.IGNORECASE)]
     # print(f"\n")
 
-NUMBER_FRACTIONS = {
+FRACTION_WORDS = {
     # singular versions
     'half': round(1/2, 3),
     'quarter': round(1/4, 3),
@@ -67,7 +67,7 @@ NUMBER_FRACTIONS = {
     'twelfths': round(1/12, 3)
 }
 
-# NUMBER_FRACTIONS = {
+# FRACTION_WORDS = {
 #     # singular versions
 #     'half': [round(1/2, 3), '1/2'],
 #     'quarter': [round(1/4, 3), '1/4'],
@@ -137,6 +137,8 @@ UNICODE_FRACTIONS = {
     '-⅞': "-7/8",
     '-⅟': "-1"
 }
+
+UNICODE_FRACTIONS_PATTERN = re.compile( r'\b(?:' + '|'.join(re.escape(word) for word in UNICODE_FRACTIONS.keys()) + r')\b', re.IGNORECASE)
 
 # # Credit to: @strangetom 
 # # https://github.com/strangetom/ingredient-parser/blob/master/ingredient_parser/_constants.py
@@ -276,7 +278,7 @@ UNITS = {
     'stalk': ['stalk', 'stalks'],
     'wheel': ['wheel', 'wheels']
 }
-# NUMBER_FRACTIONS_PATTERN = re.compile( r'\b(?:' + '|'.join(re.escape(word) for word in NUMBER_FRACTIONS.keys()) + r')\b', re.IGNORECASE)
+# FRACTION_WORDS_PATTERN = re.compile( r'\b(?:' + '|'.join(re.escape(word) for word in FRACTION_WORDS.keys()) + r')\b', re.IGNORECASE)
 
 # # create a regular expression pattern to match the units in the string
 # UNITS_PATTERN = re.compile(r'\b(?:' + '|'.join('|'.join(variants) for variants in UNITS.values()) + r')\b', re.IGNORECASE)
@@ -288,15 +290,33 @@ any_unit_pattern = '|'.join('|'.join(variants) for variants in UNITS.values())
 UNITS_PATTERN = re.compile(r'\b(?:' + any_unit_pattern + r')\b', re.IGNORECASE)
 # UNITS_PATTERN = re.compile(r'\b(?:' + '|'.join('|'.join(variants) for variants in UNITS.values()) + r')\b', re.IGNORECASE)
 
-# # Construct the regular expression pattern that matches the digit followed by 0+ spaces and
-# #  then a unit in UNITS dictionary
-# SINGLE_NUMBER_THEN_UNIT_PATTERN = re.compile(r'\b\d+\s*(?:' + any_unit_pattern + r')\b')
-# # SINGLE_NUMBER_THEN_UNIT_PATTERN = r'\b\d+\s*(?:' + any_unit_pattern + r')\b'
-
 # Construct the regular expression pattern that matches the number (including fractions and decimals)
 # followed by 0+ spaces and then a unit in UNITS dictionary
 ANY_NUMBER_THEN_UNIT_PATTERN = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\s*(?:' + any_unit_pattern + r')\b')
 # ANY_NUMBER_THEN_UNIT_PATTERN = r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\s*(?:' + any_unit_pattern + r')\b'
+# Construct the regular expression pattern that matches the unit in UNITS dictionary
+ANY_UNIT_PATTERN = re.compile(r'\b(?:' + any_unit_pattern + r')\b', re.IGNORECASE)
+
+
+# test_string8 = "tsp3 of salt, 1cup 1/4 of sugar"
+
+# # # Find all matches in the test strings
+# matches8 = re.findall(ANY_UNIT_PATTERN, test_string8)
+# print(matches8)  # Output: ['1cup']
+
+def add_whitespace(input_string):
+    # Define the regular expression pattern to match consecutive sequences of letters or digits
+    pattern = re.compile(r'([a-zA-Z]+)(\d+)|(\d+)([a-zA-Z]+)')
+
+    # Replace consecutive sequences of letters or digits with whitespace-separated sequences
+    result = re.sub(pattern, r'\1 \2\3 \4', input_string)
+
+    return result
+
+# # Test the function
+# input_string = "abc123def456ghi"
+# output_string = add_whitespace(test_string8)
+# print(output_string)  # Output: "abc 123 def 456 ghi"
 
 # Construct the regular expression pattern that matches the unit followed by 0+ spaces
 # and then a number (including fractions and decimals)

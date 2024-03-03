@@ -79,19 +79,27 @@ RUN python3 - <<EOF
 import os
 os.environ["TRANSFORMERS_CACHE"] = "/tmp"
 
-from transformers import DistilBertForTokenClassification
+from transformers import T5Tokenizer, T5ForConditionalGeneration
+# from transformers import DistilBertForTokenClassification
 
 # HuggingFace path to model
-HF_MODEL_PATH = "chambliss/distilbert-for-food-extraction"
+HF_MODEL_PATH = "google/flan-t5-large"
+# HF_MODEL_PATH = "chambliss/distilbert-for-food-extraction"
 
-# Download the model from HuggingFace
-model = DistilBertForTokenClassification.from_pretrained(HF_MODEL_PATH)
+# Load the T5 model and tokenizer from HuggingFace
+tokenizer = T5Tokenizer.from_pretrained(HF_MODEL_PATH)
+model = T5ForConditionalGeneration.from_pretrained(HF_MODEL_PATH)
+
+# # Download the model from HuggingFace
+# model = DistilBertForTokenClassification.from_pretrained(HF_MODEL_PATH)
 
 # Specify the directory where you want to save the model
-save_directory = './model/chambliss-distilbert-for-food-extraction'
+save_directory = './model/flan-t5-large'
+# save_directory = './model/chambliss-distilbert-for-food-extraction'
 
 # Save the model and its configuration to the specified directory
 model.save_pretrained(save_directory)
+tokenizer.save_pretrained(save_directory)
 EOF
 
 # Set the CMD to your handler
