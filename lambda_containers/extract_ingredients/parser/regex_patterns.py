@@ -138,34 +138,6 @@ X_SEP_NUMBERS = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)(?:\s*[xX]\s*)(?:\d
 # re.findall(SPACE_SEP_NUMBERS, '5 1.75 oz of chocolate') # Output: ['5 1.75'] Expected: ['5 1.75'] (Correct)
 # re.findall(SPACE_SEP_NUMBERS, '5 1/2oz of chocolate') # Output: ['5 1'] Expected: ['5 1/2'] (Wrong)
 
-# Regular expression to match strings wrapped in parentheses, including the parentheses
-PARENTHESIS_REGEX = re.compile(r'\((.*?)\)')
-
-# Regular expression to match parentheses containing only a whole number, decimal, or fraction
-PARENTHESIS_WITH_NUMBERS_ONLY = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+))\)')
-
-# Regular expression to match parentheses containing a number followed by a unit
-# PARENTHESIS_WITH_UNITS = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+))\s+(?:' + any_unit_pattern + r')\)')
-PARENTHESIS_WITH_UNITS = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+)\s+(?:' + any_unit_pattern + r'))\)')
-PARENTHESIS_WITH_UNITS = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+)\s*[-\s]*' + any_unit_pattern + r')\)')
-
-PARENTHESIS_REGEX.findall("1 cup of oats (2 ounces) in a big mixing bowl")
-PARENTHESIS_WITH_NUMBERS_ONLY.findall("1 cup of oats (2 ounces) in a big mixing bowl")
-PARENTHESIS_WITH_UNITS.findall("1 cup of oats (2ounces) in a big mixing bowl")
-
-PARENTHESIS_REGEX.findall("1 cup of oats (25) in a big mixing bowl")
-PARENTHESIS_WITH_NUMBERS_ONLY.findall("1 cup of oats (25) in a big mixing bowl")
-PARENTHESIS_WITH_UNITS.findall("1 cup of oats (25) in a big mixing bowl")
-
-# Example string
-example_string = "1 cup of oats (2 ounces) in a big mixing bowl"
-
-# Find all matches
-matches = PARENTHESIS_NUMBER_REGEX.findall(example_string)
-
-# Print the matches
-for match in matches:
-    print(match)
 # a number/decimal/fraction followed by 1+ spaces to another number/decimal/fraction followed by a 0+ spaces then a VOLUME unit
 # (e.g. 1/2 cup, 1 1/2 cups, 1 1/2 tablespoon)
 SPACED_NUMS_THEN_VOLUME_UNITS = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)+\s*(?:\d+/\d+|\d+\.\d+)\s*(?:' + volume_units_strings + r')\b')
@@ -210,6 +182,14 @@ QUANTITY_DASH_QUANTITY = re.compile(r"\d+(?:/\d+|\.\d+)?\s*-\s*\d+(?:/\d+|\.\d+)
 # ANY_QUANTITY_RANGE = re.compile(r"\d+(?:/\d+|\.\d+)?\s*-\s*\d+(?:/\d+|\.\d+)?")
 # QUANTITY_DASH_QUANTITY = re.compile(r"\d+(?:/\d+|\.\d+)?\s*-\s*\d+(?:/\d+|\.\d+)?")
 
+# Matches ANY numbers/decimals/fractions followed by a hypen to ANY numbers/decimals/fractions followed by a unit (0+ whitespace between last number and unit)
+QUANTITY_DASH_QUANTITY_UNIT = re.compile(r'\b\d+(?:/\d+|\.\d+)?\s*-\s*\d+(?:/\d+|\.\d+)?(?:\s*(?:' + any_unit_pattern + r'))?\b')
+# QUANTITY_DASH_QUANTITY_UNIT_OG = re.compile(r'\b\d+(?:/\d+|\.\d+)?\s*-\s*\d+(?:/\d+|\.\d+)?\s*(?:' + any_unit_pattern + r')\b')
+
+# # test strings
+# re.findall(QUANTITY_DASH_QUANTITY_UNIT, "I need 1/2 - 3/4 cups") # Output: [['1/2 - 3/4 cups']] Expected: [['1/2 - 3/4 cups']]
+# re.findall(QUANTITY_DASH_QUANTITY_UNIT, "I need 1/2 - 3/4 i like cats cup") # Output: [] Expected: [['1/2 - 3/4']]
+
 # These are sub patterns of the QUANTITY_DASH_QUANTITY that match specific types of numbers
 # Likely these won't be used but they are here for reference, as a sanity check, 
 # for testing, and to use as a starting point
@@ -229,10 +209,6 @@ FRACTION_DASH_FRACTION = re.compile(r"\d+/\d+\s*-\s*\d+/\d+")
 FRACTION_DASH_DECIMAL = re.compile(r"\d+/\d+\s*-\s*\d+\.\d+")
 FRACTION_DASH_WHOLE_NUMBER = re.compile(r"\d+/\d+\s*-\s*\d+")
 
-#### (Old version of the QUANTITY_DASH_QUANTITY)
-QUANTITY_RANGE = re.compile(r"\d+(?:\.\d+)?\s*(?:\s*-\s*)+\d+(?:\.\d+)?") #  matches numbers AND decimals with a hyphen in between them
-# QUANTITY_RANGE = re.compile(r"\d+\s*(?:\s*-\s*)+\d+") #  matches numbers with a hyphen in between them (only whole numbers seperated by hypens)
-
 # match pattern for a range of number/decimal/fraction with "to" or "or" in between them (e.g. "1/2 to 3/4", "1/2 or 3/4")
 QUANTITY_TO_OR_QUANTITY = re.compile(r'\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:to|or)\s*(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))') # Works for if there is NO space between the number and the words "to" or "or" for either the first or second numbers
 # RANGE_WITH_TO_OR = re.compile(r'\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s+(?:to|or)\s+(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))') # requires a space between the number and the word and or the "to" or "or" and the number,fraction, or decimal
@@ -243,6 +219,12 @@ BETWEEN_QUANTITY_AND_QUANTITY = re.compile(r'\bbetween\b\s*((?:\d+(?:\.\d+)?\s*(
 # BETWEEN_NUM_AND_NUM = re.compile(r'\bbetween\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s+(?:and|&)\s+(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))')
 # BETWEEN_NUM_AND_NUM = re.compile(r'\bbetween\b\s*((?:\d*\s*/\s*\d+|\d+)\s+(?:and|&)\s+(?:\d*\s*/\s*\d+|\d+))')
 # BETWEEN_NUM_AND_NUM = re.compile(r'between\s+(\d*\s*/\s*\d+|\d+)\s+(?:and|&)\s+(\d*\s*/\s*\d+|\d+)')
+
+
+####### (OLD VERSION of the QUANTITY_DASH_QUANTITY) ########
+# TODO: can probably drop this pattern...
+QUANTITY_RANGE = re.compile(r"\d+(?:\.\d+)?\s*(?:\s*-\s*)+\d+(?:\.\d+)?") #  matches numbers AND decimals with a hyphen in between them
+# QUANTITY_RANGE = re.compile(r"\d+\s*(?:\s*-\s*)+\d+") #  matches numbers with a hyphen in between them (only whole numbers seperated by hypens)
 
 # -----------------------------------------------------------------------------
 # --------------------------- Fraction specific PATTERNS -----------------------
@@ -304,8 +286,30 @@ REPEAT_UNIT_RANGES = re.compile(r'(\d+(?:\.\d+|/\d+)?)\s*([a-zA-Z]+)\s*-\s*(\d+(
 # --------------------------- Misc. patterns -----------------------------
 # Patterns for converting: 
 # - Pattern for finding consecutive letters and digits in a string so whitespace can be added
+# - Pattern for matching strings wrapped in parentheses
+# - Pattern for matching parentheses containing only a whole number, decimal, or fraction
+# - Pattern for matching parentheses containing a number followed by a unit
 # -----------------------------------------------------------------------------
 CONSECUTIVE_LETTERS_DIGITS = re.compile(r'([a-zA-Z]+)(\d+)|(\d+)([a-zA-Z]+)')
+
+# Regular expression to match strings wrapped in parentheses, including the parentheses
+PARENTHESIS_VALUES = re.compile(r'\((.*?)\)')
+
+# Regular expression to match parentheses containing only a whole number, decimal, or fraction
+PARENTHESIS_WITH_NUMBERS_ONLY = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+))\)')
+
+# Regular expression to match parentheses containing a number followed by a unit
+# PARENTHESIS_WITH_UNITS = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+))\s+(?:' + any_unit_pattern + r')\)')
+# PARENTHESIS_WITH_UNITS = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+)\s+(?:' + any_unit_pattern + r'))\)')
+PARENTHESIS_WITH_UNITS = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+)\s*[-\s]*' + any_unit_pattern + r')\)')
+
+# PARENTHESIS_REGEX.findall("1 cup of oats (2 ounces) in a big mixing bowl")
+# PARENTHESIS_WITH_NUMBERS_ONLY.findall("1 cup of oats (2 ounces) in a big mixing bowl")
+# PARENTHESIS_WITH_UNITS.findall("1 cup of oats (2ounces) in a big mixing bowl")
+
+# PARENTHESIS_REGEX.findall("1 cup of oats (25) in a big mixing bowl")
+# PARENTHESIS_WITH_NUMBERS_ONLY.findall("1 cup of oats (25) in a big mixing bowl")
+# PARENTHESIS_WITH_UNITS.findall("1 cup of oats (25) in a big mixing bowl")
 
 # -----------------------------------------------------------------------------
 # --------------------------- Class to store all regex patterns -----------------------
@@ -364,6 +368,7 @@ class RecipeRegexPatterns:
 
         # range patterns
         self.QUANTITY_DASH_QUANTITY = QUANTITY_DASH_QUANTITY
+        self.QUANTITY_DASH_QUANTITY_UNIT = QUANTITY_DASH_QUANTITY_UNIT
         self.QUANTITY_RANGE = QUANTITY_RANGE
         self.QUANTITY_TO_OR_QUANTITY = QUANTITY_TO_OR_QUANTITY
         self.BETWEEN_QUANTITY_AND_QUANTITY = BETWEEN_QUANTITY_AND_QUANTITY
@@ -389,6 +394,9 @@ class RecipeRegexPatterns:
 
         # miscellaneous patterns
         self.CONSECUTIVE_LETTERS_DIGITS = CONSECUTIVE_LETTERS_DIGITS
+        self.PARENTHESIS_VALUES = PARENTHESIS_VALUES
+        self.PARENTHESIS_WITH_NUMBERS_ONLY = PARENTHESIS_WITH_NUMBERS_ONLY
+        self.PARENTHESIS_WITH_UNITS = PARENTHESIS_WITH_UNITS
 
     def find_matches(self, input_string: str) -> Dict[str, List[Union[str, Tuple[str]]]]:
         """
@@ -453,7 +461,7 @@ class RecipeRegexPatterns:
             "ANY_NUMBER_THEN_UNIT": "Matches a number followed by a unit.",
             "ANY_NUMBER_THEN_ANYTHING_THEN_UNIT": "Matches a number followed by any text and then a unit.",
             "ANY_UNIT_PATTERN": "Matches any unit.",
-            "ANY_NUMBER": "Matches any number/decimal/fraction in a string padded by atleast 1+ whitespaces.",
+            "ANY_NUMBER": "Matches any number/decimal/fraction in a string padded by at least 1+ whitespaces.",
             "ALL_NUMBERS": "Matches ALL number/decimal/fraction in a string regardless of padding.",
             "SPACE_SEP_NUMBERS": "Matches any number/decimal/fraction followed by a space and then another number/decimal/fraction.",
             "SPACED_NUMS_THEN_VOLUME_UNITS": "Matches a number/decimal/fraction followed by 1+ spaces to another number/decimal/fraction followed by a 0+ spaces then a VOLUME unit.",
@@ -461,6 +469,7 @@ class RecipeRegexPatterns:
             "NUMBER_THEN_UNIT_ABBR": "Matches a number followed by a unit abbreviation.",
             "NUMBER_THEN_UNIT_WORD": "Matches a number followed by a unit word (full word string as unit).",
             "QUANTITY_DASH_QUANTITY": "Matches numbers/decimals/fractions followed by a hyphen to numbers/decimals/fractions.",
+            "QUANTITY_DASH_QUANTITY_UNIT": "Matches numbers/decimals/fractions followed by a hyphen to numbers/decimals/fractions followed by a unit (0+ whitespace between last number and the unit).",
             "QUANTITY_RANGE": "Matches numbers/decimals/fractions with a hyphen in between them.",
             "QUANTITY_TO_OR_QUANTITY": "Matches numbers/decimals/fractions separated by 'to' or 'or'.",
             "BETWEEN_QUANTITY_AND_QUANTITY": "Matches numbers/decimals/fractions separated by 'between' and 'and'.",
@@ -479,7 +488,11 @@ class RecipeRegexPatterns:
             "MULTI_PART_FRACTIONS_PATTERN": "Matches multi-part fractions in a string. (Deprecated)",
             "MULTI_PART_FRACTIONS_PATTERN_AND": "Matches multi-part fractions with 'and' or '&' in between the numbers. (Deprecated)",
             "REPEAT_UNIT_RANGES": "Matches repeated unit strings in a string.",
+
             "CONSECUTIVE_LETTERS_DIGITS": "Matches consecutive letters and digits in a string.",
+            "PARENTHESIS_VALUES": "Matches strings wrapped in parentheses, including the parentheses.",
+            "PARENTHESIS_WITH_NUMBERS_ONLY": "Matches parentheses containing only a whole number, decimal, or fraction.",
+            "PARENTHESIS_WITH_UNITS": "Matches parentheses containing a number followed by a unit."
         }
 
         # Retrieve description based on pattern name

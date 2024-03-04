@@ -291,6 +291,75 @@ class RecipeParser:
             print("\n")
 
         return ingredient
+    
+    def _avg_ranges(self) -> None:
+        """
+        Replace ranges of numbers with their average in the parsed ingredient.
+        Examples:
+        "1-2 oz" -> "1.5 oz"
+        "1 - 2 ft" -> "1.5 ft"
+        """
+
+        # ingredient = '2 0.5 cups of sugar'
+        # ingredient = 'a lemon'
+        # ingredient = "1.5 lb of sugar"
+        # ingredient = '1 0.5 pounds skinless, boneless chicken breasts, cut into 0.5 inch pieces'
+
+        # ingredient = output[4]
+        # # ingredient = '1 - 2 oz of butter, 20 - 50 grams of peanuts'
+        # ingredient = '1 - 2 oz of butter, 20 - 50 of peanuts'
+        # for k, v in regex.find_matches(ingredient).items():
+        #     print(f"{k}: {v}")
+
+        # all_ranges = re.findall(regex.QUANTITY_DASH_QUANTITY_UNIT, ingredient)
+        # all_ranges = re.finditer(regex.QUANTITY_DASH_QUANTITY_UNIT, ingredient)
+        
+        all_ranges = re.finditer(regex.QUANTITY_DASH_QUANTITY, self.parsed_ingredient)
+        # all_ranges = re.finditer(regex.QUANTITY_DASH_QUANTITY, ingredient)
+
+        # initialize offset and replacement index values for updating the ingredient string, 
+        # these will be used to keep track of the position of the match in the string
+        offset = 0
+        replacement_index = 0
+
+        # Update the ingredient string with the merged values
+        for match in all_ranges:
+            # print(f"Ingredient string: {self.parsed_ingredient}")
+
+            # Get the start and end positions of the match
+            start, end = match.start(), match.end()
+
+            print(f"Match: {match.group()} at positions {start}-{end}") if self.debug else None
+
+            # Get the range values from the match
+            range_values = re.findall(regex.QUANTITY_DASH_QUANTITY, match.group())
+
+            print(f"Range Values: {range_values}") if self.debug else None
+            
+            # split the range values into a list of lists
+            split_range_values = [i.split("-") for i in range_values]
+
+            # get the average of each of the range values
+            range_avgs    = [sum([float(num_str) for num_str in i]) / 2 for i in split_range_values][0]
+            range_average = self._make_int_or_float_str(str(range_avgs))
+
+            print(f"Range Averages: {range_average}") if self.debug else None
+
+            # Calculate the start and end positions in the modified string
+            modified_start = start + offset
+            modified_end = end + offset
+
+            # print(f" -> Modified match positions: {modified_start}-{modified_end}")
+            # print(f"Replacing {match.group()} with '{merged_quantity}'...")
+            
+            # Construct the modified string with the replacement applied
+            self.parsed_ingredient = self.parsed_ingredient[:modified_start] + str(range_average) + self.parsed_ingredient[modified_end:]
+            # ingredient = ingredient[:modified_start] + str(range_average) + ingredient[modified_end:]
+
+            # Update the offset for subsequent replacements
+            offset += len(range_average) - (end - start)
+            # replacement_index += 1
+            # print(f" --> Output ingredient: \n > '{ingredient}'")
 
     def _replace_and_with_hyphen(self, match):
         # Replace "and" and "&" with hyphens
@@ -542,6 +611,24 @@ class RecipeParser:
             replacement_index += 1
             # print(f" --> Output ingredient: \n > '{self.parsed_ingredient}'")
 
+    def _replace_a_or_an_units(self) -> None:
+        """
+        Replace "a" or "an" with "1" in the parsed ingredient if no number is present in the ingredient string.
+        """
+        # ingredient = "a lemon"
+
+        # lowercase and split the ingredient string
+        self.parsed_ingredient = self.parsed_ingredient.lower()
+        split_ingredient = self.parsed_ingredient.split()
+
+        matched_nums = re.findall(regex.ALL_NUMBERS, self.parsed_ingredient)
+
+        if split_ingredient[0] in ["a", "an"] and not matched_nums:
+            split_ingredient[0] = "1"
+            # ingredient = " ".join(split_ingredient)
+            self.parsed_ingredient = " ".join(split_ingredient)
+            # return ingredient
+        
     def _drop_special_characters(self):
 
         # Drop unwanted periods and replace them with whitespace
@@ -633,12 +720,14 @@ class RecipeParser:
             self._fix_ranges,
             self._force_ws,
             self._remove_repeat_units,
-            self._merge_multi_nums
+            self._merge_multi_nums,
+            self._replace_a_or_an_units,
+            self._avg_ranges
         ]
 
         # call each method in the list on the input ingredient string
         for method in methods:
-            print(f"Calling method: {method}") if self.debug else None
+            print(f"Calling method: {method.__name__}") if self.debug else None
             print(f"> Starting ingredient: '{self.parsed_ingredient}'") if self.debug else None
 
             method()
@@ -691,6 +780,53 @@ class RecipeParser:
         print(f'**********\n ---> Returning parsed ingredient: {self.parsed_ingredient} \n **********') if self.debug else None
         return self.parsed_ingredient
     
+def _make_int_or_float_str(number_str: str) -> str:
+    """ Convert a string representation of a number to its integer or float equivalent.
+    If the number is a whole number, return the integer value as a string. If the number is a decimal, return the float value as a string.
+    Args:
+        number_str (str): The string representation of the number.
+    Returns:
+        str: The integer or float value of the number as a string.
+    
+    Examples:
+    >>> make_int_or_float_str("1.0") 
+    "1"
+    >>> make_int_or_float_str("1")
+    "1"
+    >>> make_int_or_float_str("0.25")
+    "0.25"
+    """
+    number = float(number_str.strip())  # Convert string to float
+    if number == int(number):  # Check if float is equal to its integer value
+        return str(int(number))  # Return integer value if it's a whole number
+    else:
+        return str(number)  # Return float if it's a decimal
+    
+# def _avg_ranges() -> None:
+#         """
+#         Replace ranges of numbers with their average in the parsed ingredient.
+#         Examples:
+#         "1-2 oz" -> "1.5 oz"
+#         "1 - 2 ft" -> "1.5 ft"
+#         """
+#         # ingredient = '2 0.5 cups of sugar'
+#         # ingredient = 'a lemon'
+#         # ingredient = output[4]
+#         # # ingredient = '1 - 2 oz of butter, 20 - 50 grams of peanuts'
+#         # ingredient = '1 - 2 oz of butter, 20 - 50 of peanuts'
+#         # for k, v in regex.find_matches(ingredient).items():
+#         #     print(f"{k}: {v}")
+
+#         all_ranges = re.finditer(regex.QUANTITY_DASH_QUANTITY, ingredient)
+#         range_values = [re.findall(regex.QUANTITY_DASH_QUANTITY, i)[0] for i in all_ranges]
+    
+#         # split the range values into a list of lists
+#         split_range_values = [i.split("-") for i in range_values]
+
+#         # get the average of each of the range values
+#         range_avgs = [sum([float(num_str) for num_str in i]) / 2 for i in split_range_values]
+#         avg_values = [str((float(i) + float(j)) / 2) for i, j in range_values]
+
 ###############################################################################################################
 ######################################## Test the RecipeParser class ##########################################
 ###############################################################################################################
@@ -719,6 +855,8 @@ ingredient_strings = [
     "a 1/2 lemon",
     "an orange",
     "1/2 an orange",
+    "a 1-5lb lemon",
+    "1-2oz of butter, 20-50 grams of peanuts",
     "1 1/2 pounds skinless, boneless chicken breasts, cut into 1/2-inch pieces",
     "4 (1/2-ounce each) processed American cheese slices",
     "1 tablespoon all-purpose flour",
@@ -753,11 +891,143 @@ for ingredient in ingredient_strings:
     print(f"Parsed: {parsed_string}")
     print("\n")
 
+# ingredient_parts = {
+#     "quantity": None,
+#     "min_quantity": None,
+#     "max_quantity": None,
+#     "unit": None,
+#     "secondary_unit": None,
+#     "name": None,
+#     "preparation": None,
+#     "notes": None
+#     }
+
 for out in output:
     print(out)
-    print("\n")
+    # print("\n")
 
-ingred = output[0]
+ingredient = output[4]
+
+for k, v in regex.find_matches(ingredient).items():
+    print(f"Key: {k} - {v}")
+    # print(f"Value: {v}")
+# final_parser.__name__
+def final_parser(ingredient):
+    """
+    Parse the ingredient string into its component parts.
+    """
+    ingredient_parts = {
+        "unit": None,
+        "quantity": None,
+        "min_quantity": None,
+        "max_quantity": None,
+
+        "secondary_unit": None,
+        "secondary_quantity": None,
+        "secondary_min_quantity": None,
+        "secondary_max_quantity": None,
+        
+        "extra_units": None,
+        "ingredient_name": None,
+        "preparation": None,
+        "notes": None,
+
+        "raw_ingredient": ingredient,
+        "quantity_unit_pairs": None
+        }
+    
+    for k, v in regex.find_matches(ingredient).items():
+        print(f"Key: {k} - {v}")
+
+    # Set default values to populate
+    unit = None
+    quantity = None
+    min_quantity = None
+    max_quantity = None
+    secondary_unit = None
+    secondary_quantity = None
+    secondary_min_quantity = None
+    secondary_max_quantity = None
+    quantity_unit_pairs = None
+
+    # unit = None
+    # secondary_unit = None
+        
+    # get all of the units in the ingredient string
+    every_unit = regex.UNITS_PATTERN.findall(ingredient)
+
+    # get the basic units in the ingredient string
+    basic_units = regex.BASIC_UNITS_PATTERN.findall(ingredient)
+
+    # get the nonbasic units in the ingredient string
+    nonbasic_units = set(every_unit) - set(basic_units)
+
+    # instances of a number followed by a unit
+    number_then_unit = regex.ANY_NUMBER_THEN_UNIT.findall(ingredient)
+
+    # look for quantity ranges (numbers separated by a hyphen, e.g. 1-2 cups of sugar)
+    quantity_ranges = regex.QUANTITY_DASH_QUANTITY.findall(ingredient)
+    quantity_unit_ranges = regex.QUANTITY_DASH_QUANTITY_UNIT.findall(ingredient)
+    
+    # 1. Deal with any quantity ranges
+    # if a quantity unit range was found ("1 - 2 cups"), then lets try and get the range separated by the unit
+    # by using the QUANTITY_DASH_QUANTITY pattern and the UNIT_PATTERN pattern
+    if quantity_unit_ranges:
+        range_values = [regex.QUANTITY_DASH_QUANTITY.findall(match)[0] for match in quantity_unit_ranges]
+        range_units  = [regex.UNITS_PATTERN.findall(match)[0] for match in quantity_unit_ranges]
+
+        # split the range values into a list of lists
+        split_range_values = [i.split("-") for i in range_values]
+
+        # get the average of each of the range values
+        range_avgs = [sum([float(num_str) for num_str in i]) / 2 for i in split_range_values]
+        # range_avgs = [sum([float(num_str) for num_str in i.split("-")]) / 2 for i in range_values]
+
+        # Primary ingredient and quantities (i.e. use the first quantity and unit as the primary quantity and unit)
+        unit = range_units[0]
+
+        # get the quantity from the range avgs and the min and max values from the split range values
+        quantity = range_avgs[0]
+        
+        min_quantity, max_quantity = float(split_range_values[0][0]), float(split_range_values[0][1])
+
+        # Secondary ingredient and quantities (i.e. use the second quantity and unit as the secondary quantity and unit)
+        secondary_unit = range_units[1:]
+
+        # get the quantity from the range avgs and the min and max values from the split range values
+        secondary_quantity = range_avgs[1:]
+
+
+        print(f"Range Values: {range_values}\nRange Units: {range_units}\nRange Avgs: {range_avgs}\nQuantity: {quantity} ({min_quantity} - {max_quantity})")
+
+
+    # if there are any quantity ranges, then we need to treat the 2 spaced numbers 2 seperate numbers, a min and max
+    
+
+
+    if number_then_unit:
+        
+        # get the quantities and units from the number then unit matches
+        quantities = [regex.ALL_NUMBERS.findall(num)[0] for num in number_then_unit]
+        units = [regex.UNITS_PATTERN.findall(num)[0] for num in number_then_unit]
+
+        print(f"Number then units: {number_then_unit}\nQuantities: {quantities}\nUnits: {units}")
+
+        primary_units = units[0] # the first unit is the primary unit
+        secondary_units = units[1:] # any units after the first unit are secondary units
+
+        # primary_units = [unit for unit in units if unit in regex.constants["BASIC_UNITS_SET"]]
+        # secondary_units = set(units) - set(primary_units)
+        primary_quantity = quantities[0]
+        secondary_quantity = quantities[1:]
+
+        print(f"Primary Unit: {primary_units}\nSecondary Units: {secondary_units}")
+
+    basic_units = regex.BASIC_UNITS_PATTERN.findall(ingredient)
+    all_units = regex.UNITS_PATTERN.findall(ingredient)
+
+
+
 
 # ingred = "a"
 

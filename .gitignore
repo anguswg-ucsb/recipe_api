@@ -297,6 +297,7 @@ lambda_containers/model/*
 lambda_containers/extract_ingredients/parser/scraps.py
 lambda_containers/extract_ingredients/parser/recipe_parser3.py
 lambda_containers/extract_ingredients/parser/regex_patterns3.py
+
 model/
 model/*
 model/flan-t5-large
