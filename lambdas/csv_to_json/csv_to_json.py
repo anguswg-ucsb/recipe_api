@@ -3,7 +3,7 @@
     # a CSV file is uploaded to an S3 bucket. Row numbers for splitting the CSV into smaller groupings are 
     # then found and a reference to the original CSV and an offset row number are sent to an SQS queue.
 # Usage: python chunk_csv_lambda.py
-# Author: Angus Watters
+# Author: Angus Watters, Melissa Terry 
 
 # general utility libraries
 import os

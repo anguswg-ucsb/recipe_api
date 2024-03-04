@@ -1,45 +1,3 @@
-# FROM public.ecr.aws/lambda/python:3.8
-
-# # # Install pip
-# # RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-# #     python3 get-pip.py && \
-# #     rm get-pip.py
-
-# # Install required Python libraries
-# RUN pip install transformers torch
-
-# # Install the package from GitHub
-# RUN pip install git+https://github.com/chambliss/foodbert.git
-
-# # Set the working directory
-# WORKDIR ${LAMBDA_TASK_ROOT}
-
-# # Create a directory to store the model
-# RUN mkdir -p ./model
-
-# # Copy function code
-# COPY extract_ingredients/extract_ingredients.py ${LAMBDA_TASK_ROOT}
-
-# # Download and save the model from HuggingFace
-# RUN python3 - <<EOF
-# from transformers import DistilBertForTokenClassification
-
-# # HuggingFace path to model
-# HF_MODEL_PATH = "chambliss/distilbert-for-food-extraction"
-
-# # Download the model from HuggingFace
-# model = DistilBertForTokenClassification.from_pretrained(HF_MODEL_PATH)
-
-# # Specify the directory where you want to save the model
-# save_directory = './model/chambliss-distilbert-for-food-extraction'
-
-# # Save the model and its configuration to the specified directory
-# model.save_pretrained(save_directory)
-# EOF
-
-# # Set the CMD to your handler
-# CMD [ "extract_ingredients.extract_ingredients" ]
-
 FROM public.ecr.aws/lambda/python:3.11-x86_64
 # FROM public.ecr.aws/lambda/python:3.11.2023.12.13.21
 
@@ -105,3 +63,46 @@ EOF
 # Set the CMD to your handler
 CMD [ "extract_ingredients.extract_ingredients" ]
 
+##### Original Dockerfile #####
+
+# FROM public.ecr.aws/lambda/python:3.8
+
+# # # Install pip
+# # RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+# #     python3 get-pip.py && \
+# #     rm get-pip.py
+
+# # Install required Python libraries
+# RUN pip install transformers torch
+
+# # Install the package from GitHub
+# RUN pip install git+https://github.com/chambliss/foodbert.git
+
+# # Set the working directory
+# WORKDIR ${LAMBDA_TASK_ROOT}
+
+# # Create a directory to store the model
+# RUN mkdir -p ./model
+
+# # Copy function code
+# COPY extract_ingredients/extract_ingredients.py ${LAMBDA_TASK_ROOT}
+
+# # Download and save the model from HuggingFace
+# RUN python3 - <<EOF
+# from transformers import DistilBertForTokenClassification
+
+# # HuggingFace path to model
+# HF_MODEL_PATH = "chambliss/distilbert-for-food-extraction"
+
+# # Download the model from HuggingFace
+# model = DistilBertForTokenClassification.from_pretrained(HF_MODEL_PATH)
+
+# # Specify the directory where you want to save the model
+# save_directory = './model/chambliss-distilbert-for-food-extraction'
+
+# # Save the model and its configuration to the specified directory
+# model.save_pretrained(save_directory)
+# EOF
+
+# # Set the CMD to your handler
+# CMD [ "extract_ingredients.extract_ingredients" ]

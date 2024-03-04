@@ -209,9 +209,22 @@ FRACTION_DASH_FRACTION = re.compile(r"\d+/\d+\s*-\s*\d+/\d+")
 FRACTION_DASH_DECIMAL = re.compile(r"\d+/\d+\s*-\s*\d+\.\d+")
 FRACTION_DASH_WHOLE_NUMBER = re.compile(r"\d+/\d+\s*-\s*\d+")
 
-# match pattern for a range of number/decimal/fraction with "to" or "or" in between them (e.g. "1/2 to 3/4", "1/2 or 3/4")
-QUANTITY_TO_OR_QUANTITY = re.compile(r'\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:to|or)\s*(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))') # Works for if there is NO space between the number and the words "to" or "or" for either the first or second numbers
+# match pattern for a range of number/decimal/fraction with "to" or "or" in between them (e.g. "1/2 to 3/4", "1/2 or 3/4", "1-to-2", "1-or-2", "1 to-2")
+QUANTITY_TO_OR_QUANTITY = re.compile(r'\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:to|or|\s*-?\s*to\s*-?\s*|\s*-?\s*or\s*-?\s*)\s*(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))')
+# QUANTITY_TO_OR_QUANTITY = re.compile(r'\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:to|or|-or-|-to-)\s*(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))')
+
+### ORIGINAL below
+# QUANTITY_TO_OR_QUANTITY = re.compile(r'\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:to|or)\s*(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))') # Works for if there is NO space between the number and the words "to" or "or" for either the first or second numbers
+
+# re.findall(QUANTITY_TO_OR_QUANTITY, "1/2 to 3/4") # Output: ['1/2 to 3/4'] Expected: ['1/2 to 3/4'] (Correct)
+# re.findall(QUANTITY_TO_OR_QUANTITY, "1/2to3/4") # Output: ['1/2to3/4'] Expected: ['1/2to3/4'] (Correct)
+# re.findall(QUANTITY_TO_OR_QUANTITY, "1/2-or-3/4") # Output: ['1/2-or-3/4'] Expected: ['1/2-or-3/4'] (Correct)
+# re.findall(QUANTITY_TO_OR_QUANTITY, "1/2- or -3/4") # Output: [] Expected: ['1/2- or -3/4'] (Wrong)
+# re.findall(QUANTITY_TO_OR_QUANTITY, "1/2- or -3/4") # Output: [] Expected: ['1/2 - or - 3/4'] (Wrong)
+# re.findall(QUANTITY_TO_OR_QUANTITY, "1/2-8to-3/4") # Output: [] Expected: ['1/2 - or - 3/4'] (Wrong)
+
 # RANGE_WITH_TO_OR = re.compile(r'\b\s*((?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s+(?:to|or)\s+(?:\d+(?:\.\d+)?\s*(?:/)?\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?))') # requires a space between the number and the word and or the "to" or "or" and the number,fraction, or decimal
+
 
 # Regex pattern for matching "between" followed by a number/decimal/fraction, then "and" or "&", 
 # and then another number/decimal/fraction (e.g. "between 1/2 and 3/4")
@@ -294,6 +307,10 @@ CONSECUTIVE_LETTERS_DIGITS = re.compile(r'([a-zA-Z]+)(\d+)|(\d+)([a-zA-Z]+)')
 
 # Regular expression to match strings wrapped in parentheses, including the parentheses
 PARENTHESIS_VALUES = re.compile(r'\((.*?)\)')
+
+# Split string by instances of open and close parentheses (e.g. "1 cup of oats (2 ounces) in a big mixing bowl" -> ["1 cup of oats ", " in a big mixing bowl"]
+# When used with re.split() the string will be split on the set of open/close parentheses and the parantheses and the text inside them will be removed from the list
+SPLIT_BY_PARENTHESIS = re.compile(r'\(.*?\)') # use with re.split() 
 
 # Regular expression to match parentheses containing only a whole number, decimal, or fraction
 PARENTHESIS_WITH_NUMBERS_ONLY = re.compile(r'\((\d*(?:\.\d+|\s*/\s*\d+|\d+))\)')
@@ -395,6 +412,7 @@ class RecipeRegexPatterns:
         # miscellaneous patterns
         self.CONSECUTIVE_LETTERS_DIGITS = CONSECUTIVE_LETTERS_DIGITS
         self.PARENTHESIS_VALUES = PARENTHESIS_VALUES
+        self.SPLIT_BY_PARENTHESIS = SPLIT_BY_PARENTHESIS
         self.PARENTHESIS_WITH_NUMBERS_ONLY = PARENTHESIS_WITH_NUMBERS_ONLY
         self.PARENTHESIS_WITH_UNITS = PARENTHESIS_WITH_UNITS
 
@@ -491,6 +509,7 @@ class RecipeRegexPatterns:
 
             "CONSECUTIVE_LETTERS_DIGITS": "Matches consecutive letters and digits in a string.",
             "PARENTHESIS_VALUES": "Matches strings wrapped in parentheses, including the parentheses.",
+            "SPLIT_BY_PARENTHESIS": "Matches parentheses in a string and splits the string by them if used with re.split().",
             "PARENTHESIS_WITH_NUMBERS_ONLY": "Matches parentheses containing only a whole number, decimal, or fraction.",
             "PARENTHESIS_WITH_UNITS": "Matches parentheses containing a number followed by a unit."
         }

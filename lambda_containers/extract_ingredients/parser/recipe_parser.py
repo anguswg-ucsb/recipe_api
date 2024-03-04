@@ -1,3 +1,5 @@
+# Authors: Angus Watters, Melissa Terry 
+
 import re
 from typing import List, Dict, Any, Union, Tuple
 from fractions import Fraction
@@ -7,79 +9,6 @@ import warnings
 # from regex_patterns import regex_patterns
 # from regex_patterns import pattern_list, RegexPatterns
 from lambda_containers.extract_ingredients.parser.regex_patterns import RecipeRegexPatterns
-
-# # # Test the function
-# # units = ["oz", "grams", "kg", "lbs"]
-# # input_string = "1oz-2oz"
-# # output_string = remove_first_unit(input_string, units)
-# # print("Original string:", input_string)
-# # print("String with first unit removed:", output_string)
-
-# # Define the regular expression pattern to match numbers with a hyphen in between them
-# def update_ranges(input_string, pattern, replacement_function=None):
-#     # input_string = tmp
-#     # pattern = regex_patterns.BETWEEN_NUM_AND_NUM_PATTERN
-#     # replacement_function = replace_and_with_hyphen
-
-#     matches = pattern.findall(input_string)
-#     # matched_ranges = [match.split("-") for match in matches]
-#     if replacement_function:
-#         print(f"Replacement Function given")
-#         matched_ranges = [replacement_function(match).split("-") for match in matches]
-#     else:
-#         print(f"No Replacement Function given")
-#         matched_ranges = [match.split("-") for match in matches]
-#     print(f"Matched Ranges: \n > {matched_ranges}")
-#     updated_ranges = [" - ".join([str(int(i)) for i in match if i]) for match in matched_ranges]
-#     # Create a dictionary to map the matched ranges to the updated ranges
-#     ranges_map = dict(zip(matches, updated_ranges))
-#     # Replace the ranges in the original string with the updated ranges
-#     for original_range, updated_range in ranges_map.items():
-#         print(f"Original Range: {original_range}")
-#         print(f"Updated Range: {updated_range}")
-#         # if replacement_function:
-#         #     print(f"Replacement Function given")
-#         #     updated_range = replacement_function(updated_range)
-#         input_string = input_string.replace(original_range, updated_range)
-#         print("\n")
-#     return input_string
-# def replace_and_with_hyphen(match):
-#     # Replace "and" and "&" with hyphens
-#     return match.replace("and", "-").replace("&", "-")
-# def replace_to_or_with_hyphen(match):
-#     # Replace "and" and "&" with hyphens
-#     return match.replace("to", "-").replace("or", "-")
-# # Test string
-# tmp ='i like to eat 1-2 oz with cats and 1 - 2 ft of snow and 1 to 4 peanuts, cats do between 1  and 5 digs, i like between 1 and 2 mm'
-# # Update ranges matched by QUANTITY_RANGE_PATTERN
-# tmp = update_ranges(tmp, regex_patterns.QUANTITY_RANGE_PATTERN)
-
-# # Update ranges matched by BETWEEN_NUM_AND_NUM_PATTERN, with replacement function to replace "and" and "&"
-# tmp = update_ranges(tmp, regex_patterns.BETWEEN_NUM_AND_NUM_PATTERN, replace_and_with_hyphen)
-
-# regex_patterns.RANGE_WITH_TO_OR_PATTERN.findall(tmp)
-# self.regex_patterns.CONSECUTIVE_LETTERS_DIGITS
-# CONSECUTIVE_LETTERS_DIGITS = re.compile(r'([a-zA-Z]+)(\d+)|(\d+)([a-zA-Z]+)')
-
-# # Test strings
-# test_strings = [
-#     "apple123",
-#     "banana456",
-#     "123orange",
-#     "789grape",
-#     "apple123banana456",
-#     "123orange789grape",
-#     "apple123orange789",
-#     "123456apple"
-# ]
-
-# # Iterate over test strings and apply the regex pattern
-# for test_str in test_strings:
-#     print(f"The test string is: > '{test_str}'")
-#     print(f"found strs: \n > '{re.findall(pattern, test_str)}'")
-#     new_str = re.sub(pattern, r'\1 \2\3 \4', test_str)
-#     print(f"new str: \n > '{new_str}'")
-#     print("\n")
 
 ####################################################################################################
 ######################################## RecipeParser class ########################################
@@ -91,7 +20,7 @@ from lambda_containers.extract_ingredients.parser.regex_patterns import RecipeRe
 # # Step 4: Replace all fractions with their decimal equivalents
 # # Step 5: Remove trailing periods from units and replace all units with their standard abbreviations
 # # Step 6: Add or Multiply the numbers in a string separated by a space
-# # Step 7: Seperate any part of the string that is wrapped in paranthesis and treat this as its own string
+# # Step 7: Seperate any part of the string that is wrapped in parenthesis and treat this as its own string
 
 class RecipeParser:
     """
@@ -776,31 +705,17 @@ class RecipeParser:
         print(f"Merging multi numbers...") if self.debug else None
         self._merge_multi_nums()
 
+        print(f"Replacing 'a' or 'an' with '1'...") if self.debug else None
+        self._replace_a_or_an_units()
+
+        print(f"Average ranges...") if self.debug else None
+        self._avg_ranges()
         print(f"AFTER: \n > Ingredient: {self.ingredient} \n > Parsed Ingredient: {self.parsed_ingredient} \n") if self.debug else None
+
+
         print(f'**********\n ---> Returning parsed ingredient: {self.parsed_ingredient} \n **********') if self.debug else None
         return self.parsed_ingredient
     
-def _make_int_or_float_str(number_str: str) -> str:
-    """ Convert a string representation of a number to its integer or float equivalent.
-    If the number is a whole number, return the integer value as a string. If the number is a decimal, return the float value as a string.
-    Args:
-        number_str (str): The string representation of the number.
-    Returns:
-        str: The integer or float value of the number as a string.
-    
-    Examples:
-    >>> make_int_or_float_str("1.0") 
-    "1"
-    >>> make_int_or_float_str("1")
-    "1"
-    >>> make_int_or_float_str("0.25")
-    "0.25"
-    """
-    number = float(number_str.strip())  # Convert string to float
-    if number == int(number):  # Check if float is equal to its integer value
-        return str(int(number))  # Return integer value if it's a whole number
-    else:
-        return str(number)  # Return float if it's a decimal
     
 # def _avg_ranges() -> None:
 #         """
@@ -854,23 +769,23 @@ ingredient_strings = [
     "a lemon",
     "a 1/2 lemon",
     "an orange",
-    "1/2 an orange",
+    "1 1/3 cups ground almonds",
+    "1 (8 ounce) container plain yogurt",
     "a 1-5lb lemon",
+    "1 1/2 cups plus 2 tablespoons sugar, divided",
+    "1/3 cup torn fresh basil or mint, plus more for garnish",
+    "1/2 cup freshly grated Parmesan cheese, plus more for serving",
+    "1⁄4 cup prepared lemon curd (from 10-to-12 ounce jar)",
+    "4 (1/2-ounce each) processed American cheese slices",
+    "1 (16 ounce) skinless salmon fillet (1 inch thick)",
     "1-2oz of butter, 20-50 grams of peanuts",
     "1 1/2 pounds skinless, boneless chicken breasts, cut into 1/2-inch pieces",
-    "4 (1/2-ounce each) processed American cheese slices",
     "1 tablespoon all-purpose flour",
     "McDonald's Tartar Sauce",
-    "12 ounces dry shell or orecchiette pasta",
     "4 tablespoons salted butter, divided",
     "2 large cloves garlic, minced",
     "1/4 teaspoon salt",
-    "1/4 teaspoon freshly ground black pepper",
-    "2 cups fresh, frozen, or canned corn kernels, divided",
-    "1/2 cup freshly grated Parmesan cheese, plus more for serving",
-    "1/4 teaspoon crushed red pepper (optional)",
-    "1/3 cup torn fresh basil or mint, plus more for garnish",
-    "1 tablespoon lemon juice"
+    "1/4 teaspoon crushed red pepper (optional)"
 ]
 
 regex = RecipeRegexPatterns()
@@ -891,27 +806,152 @@ for ingredient in ingredient_strings:
     print(f"Parsed: {parsed_string}")
     print("\n")
 
-# ingredient_parts = {
-#     "quantity": None,
-#     "min_quantity": None,
-#     "max_quantity": None,
-#     "unit": None,
-#     "secondary_unit": None,
-#     "name": None,
-#     "preparation": None,
-#     "notes": None
-#     }
-
 for out in output:
     print(out)
-    # print("\n")
 
-ingredient = output[4]
+ingredient = output[-1]
+# ingredient = output[4]
 
 for k, v in regex.find_matches(ingredient).items():
     print(f"Key: {k} - {v}")
+
+re.split(regex.SPLIT_BY_PARENTHESIS, ingredient)
+for k, v in regex.find_matches("1 for (8 ounce) cup of (juice) options").items():
+    print(f"Key: {k} - {v}")
     # print(f"Value: {v}")
+
 # final_parser.__name__
+    
+
+def pull_quantities(ingredient, regex):
+
+    """Pull out all of the numbers in the string and return them as a list.
+    Args:
+        ingredient (str): The ingredient string to parse.
+    Returns:
+        list: A list of all the numbers in the ingredient string. An empty list is returned if no numbers are found.
+    """
+    # ingredient = '0.25 teaspoon crushed red pepper (optional)'
+    # for k, v in regex.find_matches(ingredient).items():
+    #     print(f"Key: {k} - {v}")
+
+    # for k, v in regex.find_matches("123 i love cats42 cups and a cat, 5587 dogs, 35.5 nuts").items():
+    #     print(f"Key: {k} - {v}")
+    # number_then_unit = regex.ANY_NUMBER_THEN_UNIT.findall(ingredient)
+
+    quantities = regex.ALL_NUMBERS.findall(ingredient)
+
+    return quantities
+
+def pull_units(ingredient, regex):
+
+    """
+    Pull out all of the units in the string
+    Returns a dictionary containing all of the units found in the ingredient string (all units, basic units, nonbasic units, volumetric units, and a flag indicating if the ingredient has a unit).
+    Args:
+        ingredient (str): The ingredient string to parse.
+    Returns:
+        dict: A dictionary containing all of the units found in the ingredient string (all units, basic units, nonbasic units, volumetric units, and a flag indicating if the ingredient has a unit).
+    Examples:
+        >>> pull_units('0.25 teaspoon crushed red pepper (optional)')
+        {'units': ['teaspoon'],
+            'basic_units': ['teaspoon'],
+            'nonbasic_units': [],
+            'volumetric_units': ['teaspoon'],
+            'has_unit': True}
+        >>> pull_units('1 1/2 cups diced tomatoes, 2 tablespoons of sugar, 1 stick of butter')
+        {'units': ['cups', 'tablespoons', 'stick'],
+            'basic_units': ['cups', 'tablespoons', 'stick'],
+            'nonbasic_units': ['stick'],
+            'volumetric_units': ['cups', 'tablespoons'],
+            'has_unit': True}
+    """
+
+    # # ingredient = '0.25 teaspoon crushed red pepper (optional)'
+    # for k, v in regex.find_matches(ingredient).items():
+    #     print(f"Key: {k} - {v}")
+
+    # initliaze the has_unit flag to True, if no units are found, then the flag will be set to False
+    has_unit = True
+
+    # get all of the units in the ingredient string
+    all_units = regex.UNITS_PATTERN.findall(ingredient)
+
+    # get the basic units in the ingredient string by checking if the units are in the basic units set
+    basic_units = [unit for unit in all_units if unit in regex.constants["BASIC_UNITS_SET"]]
+    # basic_units = regex.BASIC_UNITS_PATTERN.findall(ingredient) # Does the same thing but uses regex, probably better to NOT regex backtrack if we can avoid it..
+
+    # get the nonbasic units in the ingredient string by checking if the units are not in the basic units set
+    nonbasic_units = list(set(all_units) - set(basic_units))
+
+    # get the volumetric units in the ingredient string by checking if the units are in the volumetric units set
+    volumetric_units = [unit for unit in all_units if unit in regex.constants["VOLUME_UNITS_SET"]]
+    # volumetric_units = regex.VOLUME_UNITS_PATTERN.findall(ingredient) 
+
+    # if no units are found, then set the has_unit flag to False
+    if not all_units and not basic_units and not nonbasic_units and not volumetric_units:
+        has_unit = False
+
+    found_units = {"units" : all_units, 
+                  "basic_units" : basic_units, 
+                  "nonbasic_units" : nonbasic_units, 
+                  "volumetric_units" : volumetric_units,
+                  "has_unit" : has_unit}
+    
+    return found_units
+
+def separate_parenthesis(ingredient, regex):
+
+    # ingredient = '0.25 teaspoon crushed red pepper (optional)'
+    # ingredient = '0.25 teaspoon (6 ounces options) crushed (optional) red pepper'
+    # ingred = "1/2 (8 ounce) steaks with almonds"
+
+    # for k, v in regex.find_matches(ingredient).items():
+    #     print(f"Key: {k} - {v}")
+
+    # split the ingredient string by the open/close parenthesis sets
+    no_parenthesis = re.split(regex.SPLIT_BY_PARENTHESIS, ingredient)
+
+    # remove any leading or trailing whitespace from the split strings and join them back together
+    no_parenthesis = " ".join([i.strip() for i in no_parenthesis])
+
+    # get the set of paranthesis values
+    parentheses = re.findall(regex.SPLIT_BY_PARENTHESIS, ingredient)
+    # ingredient, no_parenthesis, parentheses
+
+    parsed_parenthesis = {"raw_string" : ingredient, 
+                        "parenthesis_removed" : no_parenthesis, 
+                        "parenthesis":parentheses}
+    
+    return parsed_parenthesis
+
+# def pull_units(ingredient):
+
+#     # ingredient = '0.25 teaspoon crushed red pepper (optional)'
+#     for k, v in regex.find_matches(ingredient).items():
+#         print(f"Key: {k} - {v}")
+
+#     # for k, v in regex.find_matches("123 i love cats42 cups and a cat, 5587 dogs, 35.5 nuts").items():
+#     #     print(f"Key: {k} - {v}")
+#     number_then_unit = regex.ANY_NUMBER_THEN_UNIT.findall(ingredient)
+for out in output:
+    print(f"Test string: {out}")
+
+    extracted_quantities = pull_quantities(out, regex)
+    extracted_units = pull_units(out, regex)
+    extracted_parenthesis = separate_parenthesis(out, regex)
+
+    print(f"Quantities: {extracted_quantities}")
+    print(f"""All Units: {extracted_units['units']}""")
+
+    print(f"Basic Units: {extracted_units['basic_units']}")
+    print(f"""Nonbasic Units: {extracted_units["nonbasic_units"]}""")
+
+    print(f"""Removed parenthesis: {extracted_parenthesis["parenthesis_removed"]}""")
+    print(f"""Parenthesis: {extracted_parenthesis["parenthesis"]}""")
+    print("\n")
+
+
 def final_parser(ingredient):
     """
     Parse the ingredient string into its component parts.
@@ -1661,3 +1701,77 @@ print(parsed_ingredient)
 #         total += Fraction(i)
     
 #     return round(float(total), truncate)
+
+
+# # # Test the function
+# # units = ["oz", "grams", "kg", "lbs"]
+# # input_string = "1oz-2oz"
+# # output_string = remove_first_unit(input_string, units)
+# # print("Original string:", input_string)
+# # print("String with first unit removed:", output_string)
+
+# # Define the regular expression pattern to match numbers with a hyphen in between them
+# def update_ranges(input_string, pattern, replacement_function=None):
+#     # input_string = tmp
+#     # pattern = regex_patterns.BETWEEN_NUM_AND_NUM_PATTERN
+#     # replacement_function = replace_and_with_hyphen
+
+#     matches = pattern.findall(input_string)
+#     # matched_ranges = [match.split("-") for match in matches]
+#     if replacement_function:
+#         print(f"Replacement Function given")
+#         matched_ranges = [replacement_function(match).split("-") for match in matches]
+#     else:
+#         print(f"No Replacement Function given")
+#         matched_ranges = [match.split("-") for match in matches]
+#     print(f"Matched Ranges: \n > {matched_ranges}")
+#     updated_ranges = [" - ".join([str(int(i)) for i in match if i]) for match in matched_ranges]
+#     # Create a dictionary to map the matched ranges to the updated ranges
+#     ranges_map = dict(zip(matches, updated_ranges))
+#     # Replace the ranges in the original string with the updated ranges
+#     for original_range, updated_range in ranges_map.items():
+#         print(f"Original Range: {original_range}")
+#         print(f"Updated Range: {updated_range}")
+#         # if replacement_function:
+#         #     print(f"Replacement Function given")
+#         #     updated_range = replacement_function(updated_range)
+#         input_string = input_string.replace(original_range, updated_range)
+#         print("\n")
+#     return input_string
+# def replace_and_with_hyphen(match):
+#     # Replace "and" and "&" with hyphens
+#     return match.replace("and", "-").replace("&", "-")
+# def replace_to_or_with_hyphen(match):
+#     # Replace "and" and "&" with hyphens
+#     return match.replace("to", "-").replace("or", "-")
+# # Test string
+# tmp ='i like to eat 1-2 oz with cats and 1 - 2 ft of snow and 1 to 4 peanuts, cats do between 1  and 5 digs, i like between 1 and 2 mm'
+# # Update ranges matched by QUANTITY_RANGE_PATTERN
+# tmp = update_ranges(tmp, regex_patterns.QUANTITY_RANGE_PATTERN)
+
+# # Update ranges matched by BETWEEN_NUM_AND_NUM_PATTERN, with replacement function to replace "and" and "&"
+# tmp = update_ranges(tmp, regex_patterns.BETWEEN_NUM_AND_NUM_PATTERN, replace_and_with_hyphen)
+
+# regex_patterns.RANGE_WITH_TO_OR_PATTERN.findall(tmp)
+# self.regex_patterns.CONSECUTIVE_LETTERS_DIGITS
+# CONSECUTIVE_LETTERS_DIGITS = re.compile(r'([a-zA-Z]+)(\d+)|(\d+)([a-zA-Z]+)')
+
+# # Test strings
+# test_strings = [
+#     "apple123",
+#     "banana456",
+#     "123orange",
+#     "789grape",
+#     "apple123banana456",
+#     "123orange789grape",
+#     "apple123orange789",
+#     "123456apple"
+# ]
+
+# # Iterate over test strings and apply the regex pattern
+# for test_str in test_strings:
+#     print(f"The test string is: > '{test_str}'")
+#     print(f"found strs: \n > '{re.findall(pattern, test_str)}'")
+#     new_str = re.sub(pattern, r'\1 \2\3 \4', test_str)
+#     print(f"new str: \n > '{new_str}'")
+#     print("\n")

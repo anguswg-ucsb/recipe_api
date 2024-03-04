@@ -1,3 +1,5 @@
+# Author: Angus Watters, Melissa Terry 
+
 from fastapi import FastAPI
 from app.api.api_v1.api import router as api_router
 from fastapi.middleware.cors import CORSMiddleware

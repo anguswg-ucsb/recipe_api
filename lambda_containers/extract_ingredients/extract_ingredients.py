@@ -1,3 +1,4 @@
+# Author: Angus Watters, Melissa Terry 
 import json
 import os
 import boto3
