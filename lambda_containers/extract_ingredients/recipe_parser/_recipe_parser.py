@@ -1251,7 +1251,7 @@ class RecipeParser:
         # we will choose to use the quantity/unit pairing that is has a unit in the BASIC_UNITS_SET
         # Case when BOTH are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
         # Case when NEITHER are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
-        if self.best_quantity and unit:
+        if self.best_quantity and self.best_unit:
             parenthesis_unit_is_basic = parenthesis_unit in regex.constants["BASIC_UNITS_SET"]
             unit_is_basic = self.best_unit in regex.constants["BASIC_UNITS_SET"]
 
@@ -1365,15 +1365,15 @@ class RecipeParser:
 # ###############################################################################################################
 # ingredient = "1/4 teaspoon crushed (0.25 ounces) (required) red pepper (optional)"
 # ingredient = "1/4 teaspoon crushed red peppe"
-# ingredient = "1 large yellow onion, cut into 1/4-inch-thick slices (about 3 cups)"
-ingredient = "salmon fillets (3)"
+ingredient = "1 large yellow onion, cut into 1/4-inch-thick slices (about 3 cups)"
+# ingredient = "salmon fillets (3)"
 # # # # # ingredient = "salmon (3)"
 # # # ingredient = "2 8 ounce salmon fillets (3)"
 # # # ingredient = "2 salmon fillets (3)"
 # # # ingredient = "4 salmon fillets (8 ounces)"
-# # # # ingredient = "4 salmon fillets (8-ounces)"
+ingredient = "4 salmon fillets (8-ounces)"
 
-# # # # # # # # # # ingredient = "1/4 teaspoon crushed (optional) red pepper"
+# # # # # # # # # ingredient = "1/4 teaspoon crushed (optional) red pepper"
 regex = RecipeRegexPatterns()
 parser = RecipeParser(ingredient=ingredient, regex=regex, debug=False)
 parser.parse()
@@ -1384,12 +1384,6 @@ parser.best_quantity
 parser.best_unit
 parser.parenthesis_notes
 
-# for i in parser.parenthesis_content:
-#     print(f"Addressing parenthesis: '{i}'")
-#     regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i)[0]
-#     # parser.address_quantity_only_parenthesis(i)
-# parser.reduced_ingredient
-# parser.is_required
 # address_equivalence_parenthesis(parser.reduced_ingredient, 
 #                                   parser.parenthesis_content,
 #                                   parser.best_quantity, 
@@ -1798,65 +1792,6 @@ def address_quantity_only_parenthesis(ingredient: str, parenthesis: str, quantit
     return [parenthesis_quantity, unit, description]
 
 
-# str(float("5.5") * float("6"))
-
-
-# parenthesis_list = parser.parenthesis_content
-
-# ingredient = parser.reduced_ingredient
-# check_if_required_parentesis(parenthesis_list)
-
-# def check_if_required_parentesis(parenthesis_list: list) -> bool:
-#     """
-#     Check if the parenthesis content contains the word "optional".
-#     Args:
-#         parenthesis_list (list): A list of strings containing the content of the parenthesis in the ingredient string.
-#     Returns:
-#         bool: A boolean indicating whether the word "optional" is found in the parenthesis content.
-#     """
-
-#     optional_set = set(["option", "options", "optional", "opt.", "opts.", "opt", "opts", "unrequired"])
-#     required_set = set(["required", "requirement", "req.", "req"])
-
-#     optional_match_flag = any([True if regex.OPTIONAL_STRING.findall(i) else False for i in parenthesis_list])
-#     required_match_flag = any([True if regex.REQUIRED_STRING.findall(i) else False for i in parenthesis_list])
-#     # optional_matches = [regex.OPTIONAL_STRING.findall(i) for i in parenthesis_list]
-#     # required_matches = [regex.REQUIRED_STRING.findall(i) for i in parenthesis_list]
-    
-#     optional_str_flag = any([any([True if word in optional_set else False for word in i.replace("(", "").replace(")", "").replace(",", " ").split()]) for i in parenthesis_list])
-#     required_str_flag = any([any([True if word in required_set else False for word in i.replace("(", "").replace(")", "").replace(",", " ").split()]) for i in parenthesis_list])
-    
-#     is_required = (True if required_match_flag or required_str_flag else False) or (False if optional_match_flag or optional_str_flag else True)
-
-#     # if required_match_flag or required_str_flag:
-#     #     is_required = True
-#     # elif optional_match_flag or optional_str_flag:
-
-
-#     return is_required
-
-# def check_if_required_string(ingredient: str) -> bool:
-#     """
-#     Check the ingredient string for optional or required text
-#     Args:
-#         ingredient (str): The ingredient string to parse.
-#     Returns:
-#         bool: A boolean indicating whether the ingredient is required or not.
-#     """
-
-#     optional_set = set(["option", "options", "optional", "opt.", "opts.", "opt", "opts", "unrequired"])
-#     required_set = set(["required", "requirement", "req.", "req"])
-
-#     optional_match_flag = True if regex.OPTIONAL_STRING.findall(ingredient) else False
-#     required_match_flag = True if regex.REQUIRED_STRING.findall(ingredient) else False
-    
-#     optional_str_flag = any([True if word in optional_set else False for word in ingredient.replace(",", " ").split()])
-#     required_str_flag = any([True if word in required_set else False for word in ingredient.replace(",", " ").split()])
-
-#     # if any "required" strings were matched or found, or if no "optional" strings were matched or found, then the ingredient is required
-#     is_required = (True if required_match_flag or required_str_flag else False) or (False if optional_match_flag or optional_str_flag else True)
-
-#     return is_required
 # ###############################################################################################################
 # ######################################## Test the RecipeParser class ##########################################
 # ###############################################################################################################
@@ -2481,27 +2416,15 @@ def address_quantity_only_parenthesis(ingredient: str, parenthesis: str, quantit
 #             # a description of the ingredient OR a better quanity / unit combo
 #         if not ingredient_parts["quantities"] and ingredient_parts["units"]:
 #             pass
-        
 #         # we have a quanity and a unit, so we can assume that the number in the parenthesis is a description of the ingredient
 #         if ingredient_parts["quantities"] and ingredient_parts["units"]:
 #             pass
-        
 #         # we have a quantity, but no unit 
 #         if ingredient_parts["quantities"] and not ingredient_parts["units"]:
 #             pass
-
-
-#     regex.PARENTHESIS_WITH_NUMBER_UNIT.findall(ingredient_parts["parenthesis_content"][0])
-#     regex.PARENTHESIS_WITH_NUMBER_ANYTHING_UNIT.findall(ingredient_parts["parenthesis_content"][0])
-
-#     re.findall(regex.PARENTHESIS_WITH_NUMBER_ANYTHING_UNIT, ingredient_parts["parenthesis_content"][0])
-#     regex.print_matches(ingredient_parts["parenthesis_content"][1])
-
 # ###############################################################################################################
 # ######################################## END OF CURRENT TESTS for the RecipeParser class ############
 # ###############################################################################################################
-
-# # OPTIONAL_STRING = re.compile(r'\b(?:option|optional)\b')
 
 # def separate_parenthesis(ingredient, regex):
 
