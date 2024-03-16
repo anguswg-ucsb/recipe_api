@@ -212,7 +212,7 @@ UNITS = {
     'milligram': ['milligram', 'milligrams', 'mg', 'mgs'], 
     'milliliter': ['milliliter', 'milliliters', 'ml', 'mls'], 
     # 'millimeter': ['millimeter', 'millimeters', 'mm', 'mms'], # TODO: address dimensions
-    'ounce': ['ounce', 'ounces', 'oz', 'ozs', 'oz', 'ozs'], 
+    'ounce': ['ounce', 'ounces', 'oz', 'ozs', 'oz.', 'ozs.'], 
     'package': ['package', 'packages', 'pkg', 'pkgs'], 
     'packageful': ['packageful', 'packagefuls'], 
     'packet': ['packet', 'packets'], 
@@ -222,7 +222,7 @@ UNITS = {
     'pint': ['pint', 'pints', 'pt', 'pts'], 
     'plate': ['plate', 'plates'], 
     'portion': ['portion', 'portions'], 
-    'pound': ['pound', 'pounds', 'lbs', 'lb', 'lbs'], 
+    'pound': ['pound', 'pounds', 'lbs', 'lb', 'lb.', 'lbs.'],
     'quart': ['quart', 'quarts', 'qt', 'qts'], 
     'rim': ['rim', 'rims'], 
     'roll': ['roll', 'rolls'], 
@@ -235,7 +235,7 @@ UNITS = {
     'strip': ['strip', 'strips'], 
     'tablespoon': ['tablespoon', 'tablespoons', 'tbsp', 'tbsps', "tbsp", "tbsps", "tbsp.", "tbsps.", "tbl", "tbls", "tbl.", "tbls.", "T", "tbs", "tbs."], # 'tablespoon': ['tablespoon', 'tablespoons', 'tbsp', 'tbsps', 'tbsp', 'tbsps'], 
     'tablespoonful': ['tablespoonful', 'tablespoonfuls'], 
-    'teaspoon': ['teaspoon', 'teaspoons', 'tsp', 'tsps', "tsp", "tspn", "tspns", "tspn." "tspns." , "ts", "t", "t."], # 'teaspoon': ['teaspoon', 'teaspoons', 'tsp', 'tsps', "tsp", "t"],
+    'teaspoon': ['teaspoon', 'teaspoons', 'tsp', 'tsps', "tsp", "tspn", "tspns", "tspn.", "tspns.", "ts", "t", "t."], # 'teaspoon': ['teaspoon', 'teaspoons', 'tsp', 'tsps', "tsp", "t"],
     'teaspoonful': ['teaspoonful', 'teaspoonfuls'], 
     'thigh': ['thigh', 'thighs'], 
     'tube': ['tube', 'tubes'], 
@@ -250,6 +250,14 @@ for key, pattern in UNITS.items():
     UNITS_SET.add(key)
     for val in pattern:
         UNITS_SET.add(val)
+
+# create a hash map that maps every variation of a unit to the standard unit name
+UNIT_TO_STANDARD_UNIT = {}
+
+for key, pattern in UNITS.items():
+    # print(f"key: {key}, pattern: {pattern}")
+    for val in pattern:
+        UNIT_TO_STANDARD_UNIT[val] = key
 
 # Only the core basic imperial and metric units (Excludes the more specific units like "stalk", "fillet", "slices", etc.)
 BASIC_UNITS = {
@@ -270,8 +278,8 @@ BASIC_UNITS = {
     'liter': ['liter', 'liters', 'l'],
 
     # Imperial weight units
-    'ounce': ['ounce', 'ounces', 'oz', 'ozs', "oz", "ozs"],
-    'pound': ['pound', 'pounds', 'lbs', 'lb'],
+    'ounce': ['ounce', 'ounces', 'oz', 'ozs', 'oz.', 'ozs.'], 
+    'pound': ['pound', 'pounds', 'lbs', 'lb', 'lb.', 'lbs.'],
 
     # Metric weight units
     'milligram': ['milligram', 'milligrams', 'mg', 'mgs'],
@@ -313,13 +321,21 @@ for key, pattern in VOLUME_UNITS.items():
         VOLUME_UNITS_SET.add(val)
 
 # dry weight units dictionary, things like "ounce", "pound", "gram", etc.
-DRY_WEIGHT_UNITS = {
-    'ounce': ['ounce', 'ounces', 'oz', 'ozs', 'oz', 'ozs'],
-    'pound': ['pound', 'pounds', 'lbs', 'lb', 'lbs'],
+WEIGHT_UNITS = {
+    'ounce': ['ounce', 'ounces', 'oz', 'ozs', 'oz.', 'ozs.'], 
+    'pound': ['pound', 'pounds', 'lbs', 'lb', 'lb.', 'lbs.'],
     'gram': ['gram', 'grams', 'g'],
     'kilogram': ['kilogram', 'kilograms', 'kg', 'kgs'],
     'milligram': ['milligram', 'milligrams', 'mg', 'mgs']
 }
+
+WEIGHT_UNITS_SET = set()
+
+# add all of the keys and values to a Hash set to contain all of the weight units words
+for key, pattern in WEIGHT_UNITS.items():
+    WEIGHT_UNITS_SET.add(key)
+    for val in pattern:
+        WEIGHT_UNITS_SET.add(val)
 
 # dimensions dictioanry, things like "feet", "inches", "centimeters", etc.
 DIMENSION_UNITS = {
@@ -424,7 +440,6 @@ PREP_WORDS = set([
     "cubed",
     "shredded",
     "pitted",
-    
 ])
 
 # specific words that are used to describe something about a unit (i.e. "packed cup", "level tablespoon")
@@ -446,6 +461,167 @@ APPROXIMATE_STRINGS = set([
     "est",
     "estim", 
     "estim."
+])
+
+# phrases that are used to specify the amount of quantity per unit (i.e. "4 lbs each", "about 2 ounces each")
+QUANTITY_PER_UNIT_STRINGS = set([
+    "each",
+    "per",
+    "apiece",
+    "a piece",
+    "per each"
+])
+
+# generic list of stop words that are not useful for parsing and should be removed from the string
+STOP_WORDS = set([
+    "i",
+    "me",
+    "my",
+    "myself",
+    "we",
+    "our",
+    "ours",
+    "ourselves",
+    "you",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+    "he",
+    "him",
+    "his",
+    "himself",
+    "she",
+    "her",
+    "hers",
+    "herself",
+    "it",
+    "its",
+    "itself",
+    "they",
+    "them",
+    "their",
+    "theirs",
+    "themselves",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "this",
+    "that",
+    "these",
+    "those",
+    "am",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "having",
+    "do",
+    "does",
+    "did",
+    "doing",
+    "a",
+    "an",
+    "the",
+    "and",
+    "but",
+    "if",
+    "or",
+    "because",
+    "as",
+    "until",
+    "while",
+    "of",
+    "at",
+    "by",
+    "for",
+    "with",
+    "about",
+    "against",
+    "between",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "to",
+    "from",
+    "up",
+    "down",
+    "in",
+    "out",
+    "on",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    # "s",
+    # "t",
+    "can",
+    "will",
+    "just",
+    # "don",
+    "should",
+    "now",
+    "couldn't",
+    "didn't",
+    "doesn't",
+    "don't",
+    "hadn't",
+    "hasn't",
+    "haven't",
+    "isn't",
+    "shouldn't",
+    "wasn't",
+    "weren't",
+    "won't",
+    "wouldn't",
+    "can't",
+    "aren't",
+    "hasn't",
+    "hadn't",
+    "haven't",
+    "wasn't",
+    "weren't",
+    
 ])
 
 # # Fractions represented as words

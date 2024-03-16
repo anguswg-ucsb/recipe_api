@@ -99,22 +99,34 @@ UNICODE_FRACTIONS_PATTERN = re.compile( r'\b(?:' + '|'.join(re.escape(word) for 
 # ---- Set up Alternation patterns from list of possible units and their variants ----
 
 # Generate the regular expression pattern for units in the string
-ANY_UNIT_ALT = '|'.join('|'.join(variants) for variants in _constants.UNITS.values())
+ANY_UNIT_ALT = '|'.join([re.escape(unit) for variants_list in _constants.UNITS.values() for unit in variants_list])
+# ANY_UNIT_ALT = '|'.join('|'.join(variants) for variants in _constants.UNITS.values())
+# ANY_UNIT_ALT = '|'.join('|'.join(re.escape(variant) for variant in variants) for variants in _constants.UNITS.values())
 
 # just the basic units 
-BASIC_UNIT_ALT = '|'.join('|'.join(variants) for variants in _constants.BASIC_UNITS.values())
+BASIC_UNIT_ALT = '|'.join([re.escape(unit) for variants_list in _constants.BASIC_UNITS.values() for unit in variants_list])
+# BASIC_UNIT_ALT = '|'.join('|'.join(variants) for variants in _constants.BASIC_UNITS.values())
 
 # just the non-basic units
-NON_BASIC_UNIT_ALT = '|'.join(list(_constants.NON_BASIC_UNITS_SET))
+NON_BASIC_UNIT_ALT = '|'.join([re.escape(unit) for unit in list(_constants.NON_BASIC_UNITS_SET)])
+# NON_BASIC_UNIT_ALT = '|'.join(list(_constants.NON_BASIC_UNITS_SET))
 
 # Generate the regular expression pattern for units in the string
-VOLUME_UNIT_ALT = '|'.join('|'.join(variants) for variants in _constants.VOLUME_UNITS.values())
+VOLUME_UNIT_ALT = '|'.join([re.escape(unit) for variants_list in _constants.VOLUME_UNITS.values() for unit in variants_list])
+# VOLUME_UNIT_ALT = '|'.join('|'.join(variants) for variants in _constants.VOLUME_UNITS.values())
 
 # The "sometimes might be a unit" strings as a "or" pattern
-SOMETIMES_UNIT_ALT = '|'.join(list(_constants.SOMETIMES_UNITS_SET))
+SOMETIMES_UNIT_ALT = '|'.join([re.escape(unit) for unit in list(_constants.SOMETIMES_UNITS_SET)])
+# SOMETIMES_UNIT_ALT = '|'.join(list(_constants.SOMETIMES_UNITS_SET))
 
 # get a pattern for the "approximate" strings (these are typically used to describe an equivelant amount of a unit)
-EQUIVALENT_ALT = '|'.join(list(_constants.APPROXIMATE_STRINGS))
+EQUIVALENT_ALT = '|'.join([re.escape(unit) for unit in list(_constants.APPROXIMATE_STRINGS)])
+# EQUIVALENT_ALT = '|'.join(list(_constants.APPROXIMATE_STRINGS))
+
+# prep word alternate
+PREP_WORD_ALT = '|'.join([re.escape(prep_word) for prep_word in list(_constants.PREP_WORDS)])
+
+STOP_WORDS_ALT = '|'.join([re.escape(stop_word) for stop_word in list(_constants.STOP_WORDS)])
 
 # ---- Use the unit varients to create the regular expression patterns ----
 
@@ -135,8 +147,15 @@ SOMETIMES_UNITS_PATTERN = re.compile(r'\b(?:' + SOMETIMES_UNIT_ALT + r')\b', re.
 # create a regular expression pattern to match specifically volume units in a string
 VOLUME_UNITS_PATTERN = re.compile(r'\b(?:' + VOLUME_UNIT_ALT + r')\b', re.IGNORECASE)
 
+# generic prep words pattern for matching prep words in a string
+PREP_WORDS_PATTERN = re.compile(r'\b(?:' + PREP_WORD_ALT + r')\b', re.IGNORECASE)
+
+# general stop words pattern for matching stop words in a string
+STOP_WORDS_PATTERN = re.compile(r'\b(?:' + STOP_WORDS_ALT + r')\b', re.IGNORECASE)
+
 # match any unit?
 ANY_UNIT_PATTERN = re.compile(r'\b(?:' + ANY_UNIT_ALT + r')\b', re.IGNORECASE)
+
 
 # -----------------------------------------------------------------------------
 # --------------------------- Unit/Number or Number/Unit patterns -----------------------------
@@ -197,11 +216,6 @@ AND_SEP_NUMBERS = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)(?:\s*(?:and|&)\s
 # Match any number/decimal/fraction followed by a space and then a number/decimal/fraction (Currently used version)
 # (e.g "1 1/2", "3 1/4", "3 0.5", "2.5 3/4")
 SPACE_SEP_NUMBERS = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)+\s+(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\b')
-
-# Match any number/decimal/fraction followed by 'x' or 'X' and then another number/decimal/fraction
-# (e.g "1 x 5", "1X1.5", "2.5x20")
-# TODO: Implement this pattern
-X_SEP_NUMBERS = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)(?:\s*[xX]\s*)(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\b')
 
 # # This is VERY similar to above regex but just swaps "*" and "+" as to enforce the first pattern MUST MATCH atleast 1 time 
 # SPACE_SEP_NUMBERS_OR_ANY_NUMBER_AFTER_WS = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)+\s*(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\b') 
@@ -418,11 +432,31 @@ PARENTHESIS_WITH_NUMBER_UNIT = re.compile(r'\(\s*(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\
 # is met and any number of whitespaces can pad the left and right of the string within the parenthesis
 PARENTHESIS_WITH_NUMBER_ANYTHING_UNIT = re.compile(r'\(\s*(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\s*.*?\s*(?:' + ANY_UNIT_ALT + r')\s*\)') # this is best now
 
+# 'x' or 'X' after numbers pattern
+# Match any number/decimal/fraction followed by 'x' or 'X' and then another number/decimal/fraction. An "x" or "X" is used to indicate multiplication (how many of a unit to use)
+# (e.g "1 x 5", "1X1.5", "2.5x20")
+# TODO: Implement this pattern
+X_SEP_NUMBERS = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)(?:\s*[xX]\s*)(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\b')
+
+# Match any number/decimal/fraction followed by 'x' or 'X' and 
+# is NOT followed by another character after the x (removes possiblity of accidently matching a word that starts with X after a number)
+# (e.g "1 x 5" matches "1 x", "1X1.5" matches "1X", "2.5x20" matches "2.5x", "1 xillion" mathces [])
+X_AFTER_NUMBER = re.compile(r'(?:\d*\.\d+|\d+\s*\/\s*\d+|\d+)+\s*[xX](?![a-zA-Z])')
+# QUANTITY_X_QUANTITY = re.compile(r'\b(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)(?:\s*[xX]\s*)(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\b')
+
+# Matches any nubmer/decimal/fraction, followed by 0+ spaces, then an "x" or "X", then 0+ spaces, then another number/decimal/fraction
+# (e.g. "1 x 5", "1X1.5", "2.5x20")
+QUANTITY_X_QUANTITY = re.compile(r'(?:\d*\.\d+|\d+\s*\/\s*\d+|\d+)+\s*[xX](?![a-zA-Z])\s*(?:\d*\.\d+|\d+\s*\/\s*\d+|\d+)')
+
 # Regular expression to match optional strings (e.g. "option" or "optional")
 OPTIONAL_STRING = re.compile(r'\b(?:option|options|optional|opt.|opts.|opt|opts|unrequired)\b')
 
 # Regular expression to match required strings (e.g. "required" or "requirement")
 REQUIRED_STRING = re.compile(r'\b(?:required|requirement|req.|req)\b')
+
+# matches any word ending in "ly" (e.g. "firmly", "lightly", "rapidly")
+# we use this to remove adverbs from the ingredient names (e.g. "lightly beaten eggs" -> "beaten eggs")
+WORDS_ENDING_IN_LY = re.compile(r'\b\w+ly\b')
 
 # PARENTHESIS_WITH_NUMBER_UNIT2 = re.compile(r'\(\s*(?:\d*\.\d+|\d+\s*/\s*\d+|\d+)\s*' + ANY_UNIT_ALT + r'\s*\)')
 # re.findall(PARENTHESIS_WITH_NUMBER_UNIT2, "1 cup of oats (2 ounces) in a big mixing bowl")
@@ -451,20 +485,33 @@ class RecipeRegexPatterns:
     def __init__(self) -> None:
         # Constant data values and lookup tables
         self.constants = {
+
+            # regex hashmaps
             "NUMBER_WORDS": _constants.NUMBER_WORDS,
             "FRACTION_WORDS": _constants.FRACTION_WORDS,
             "UNICODE_FRACTIONS": _constants.UNICODE_FRACTIONS,
+            
+            # unit hashmaps
             "UNITS": _constants.UNITS,
             "BASIC_UNITS": _constants.BASIC_UNITS,
             "VOLUME_UNITS": _constants.VOLUME_UNITS,
+            "WEIGHT_UNITS": _constants.WEIGHT_UNITS,
+
+            # unit hashsets
             "UNITS_SET": _constants.UNITS_SET,
             "BASIC_UNITS_SET": _constants.BASIC_UNITS_SET,
             "NON_BASIC_UNITS_SET": _constants.NON_BASIC_UNITS_SET, 
-            "SOMETIMES_UNITS_SET": _constants.SOMETIMES_UNITS_SET,
             "VOLUME_UNITS_SET": _constants.VOLUME_UNITS_SET,
+            "WEIGHT_UNITS_SET": _constants.WEIGHT_UNITS_SET,
+            "SOMETIMES_UNITS_SET": _constants.SOMETIMES_UNITS_SET,
+
             "CASUAL_QUANTITIES": _constants.CASUAL_QUANTITIES,
             "UNIT_MODIFIERS": _constants.UNIT_MODIFIERS,
-            "PREP_WORDS": _constants.PREP_WORDS
+            "PREP_WORDS": _constants.PREP_WORDS,
+            "APPROXIMATE_STRINGS": _constants.APPROXIMATE_STRINGS,
+            "QUANTITY_PER_UNIT_STRINGS": _constants.QUANTITY_PER_UNIT_STRINGS,
+            "UNIT_TO_STANDARD_UNIT": _constants.UNIT_TO_STANDARD_UNIT,
+            "STOP_WORDS": _constants.STOP_WORDS
         }
 
         # Define regex patterns
@@ -480,6 +527,8 @@ class RecipeRegexPatterns:
         self.NON_BASIC_UNITS_PATTERN = NON_BASIC_UNITS_PATTERN
         self.VOLUME_UNITS_PATTERN = VOLUME_UNITS_PATTERN
         self.SOMETIMES_UNITS_PATTERN = SOMETIMES_UNITS_PATTERN
+        self.PREP_WORDS_PATTERN = PREP_WORDS_PATTERN
+        self.STOP_WORDS_PATTERN = STOP_WORDS_PATTERN
 
         # unit/number or number/unit matching patterns
         self.ANY_NUMBER_THEN_UNIT = ANY_NUMBER_THEN_UNIT
@@ -546,8 +595,16 @@ class RecipeRegexPatterns:
         self.PARENTHESIS_WITH_UNITS = PARENTHESIS_WITH_UNITS
         self.PARENTHESIS_WITH_NUMBER_UNIT = PARENTHESIS_WITH_NUMBER_UNIT
         self.PARENTHESIS_WITH_NUMBER_ANYTHING_UNIT = PARENTHESIS_WITH_NUMBER_ANYTHING_UNIT
+
+        # "x" and "X" separators
+        self.X_SEP_NUMBERS = X_SEP_NUMBERS
+        self.X_AFTER_NUMBER = X_AFTER_NUMBER
+        self.QUANTITY_X_QUANTITY = QUANTITY_X_QUANTITY
+
+        # match specific strings 
         self.OPTIONAL_STRING = OPTIONAL_STRING
         self.REQUIRED_STRING = REQUIRED_STRING
+        self.WORDS_ENDING_IN_LY = WORDS_ENDING_IN_LY
 
     def find_matches(self, input_string: str) -> Dict[str, List[Union[str, Tuple[str]]]]:
         """
@@ -616,6 +673,8 @@ class RecipeRegexPatterns:
             "CASUAL_QUANTITIES": "Dictionary of casual quantities used in the recipe parser.",
             "UNIT_MODIFIERS": "Set of unit modifier words for lookups in recipe parser.",
             "PREP_WORDS": "Set of preparation words for lookups in recipe parser.",
+            "APPROXIMATE_STRINGS": "Set of strings that indicate an approximate quantity in the recipe parser.",
+            "QUANTITY_PER_UNIT_STRINGS": "Set of strings that indicate a quantity per unit in the recipe parser.",
             "NUMBER_WORDS_REGEX_MAP": "Dictionary of regex patterns to match number words in a string (i.e. 'one' : '1', 'two' : '2').",
             
             ### Regex patterns
@@ -628,6 +687,8 @@ class RecipeRegexPatterns:
             "NON_BASIC_UNITS_PATTERN": "Matches non-basic units in a string.",
             "VOLUME_UNITS_PATTERN": "Matches specifically volume units in a string.",
             "SOMETIMES_UNITS_PATTERN": "Matches sometimes units in a string.",
+            "PREP_WORDS_PATTERN": "Matches preparation words in a string.",
+            "STOP_WORDS_PATTERN": "Matches stop words in a string.",
             
             # Quantities followed by units
             "ANY_NUMBER_THEN_UNIT": "Matches a number followed by a unit.",
@@ -680,6 +741,11 @@ class RecipeRegexPatterns:
             "PARENTHESIS_WITH_UNITS": "Matches parentheses containing a number followed by a unit.",
             "PARENTHESIS_WITH_NUMBER_UNIT": "Matches parentheses with just a number and a unit in parenthesis.",
             "PARENTHESIS_WITH_NUMBER_ANYTHING_UNIT": "Matches parentheses with a number followed by a unit and then 0+ whitespaces until the close of the parenthesis.",
+            
+            "X_SEP_NUMBERS": "Matches any number/decimal/fraction followed by 'x' or 'X' and then another number/decimal/fraction.",
+            "X_AFTER_NUMBER": "Matches a number followed by an 'x'/'X' (can't be the start of a word starting with xX).",
+            "QUANTITY_X_QUANTITY": "Matches a number followed by an 'x'/'X' and then another number.",
+            
             "OPTIONAL_STRING": "Matches the word 'optional', 'option', 'opt', etc. in a string.",
             "REQUIRED_STRING": "Matches the word 'required', 'requirement', 'req', etc. in a string."
         }

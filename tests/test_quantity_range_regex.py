@@ -76,12 +76,12 @@ def test_QUANTITY_DASH_QUANTITY_UNIT(regex_map):
     assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 1-1.5 liters") == ['1-1.5 liters']
     assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 1.5-3 milliliters") == ['1.5-3 milliliters']
     assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 3/4-1.5 kilograms") == ['3/4-1.5 kilograms']
-    assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 2.5-3/4 inches") == ['2.5-3/4 inches']
+    assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 2.5-3/4 inches") == ['2.5-3/4'] # NOTE: Inches is NOT considered a unit for now
 
     # Multiple matches
     assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 1-5 cups and 0.5-2.5 tablespoons") == ['1-5 cups', '0.5-2.5 tablespoons']
     assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 1/2-3/4 pounds and 0.5-1/2 grams") == ['1/2-3/4 pounds', '0.5-1/2 grams']
     assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 1-1.5 liters and 1.5-3 milliliters") == ['1-1.5 liters', '1.5-3 milliliters']
-    assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 3/4-1.5 kilograms and 2.5-3/4 inches") == ['3/4-1.5 kilograms', '2.5-3/4 inches']
+    assert regex_map.QUANTITY_DASH_QUANTITY_UNIT.findall("The range is from 3/4-1.5 kilograms and 2.5-3/4 inches") == ['3/4-1.5 kilograms', '2.5-3/4']
 
 

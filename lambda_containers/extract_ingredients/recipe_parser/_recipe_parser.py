@@ -13,10 +13,10 @@ import warnings
 # # import regex class module
 # # from . import regex_patterns RecipeRegexPatterns 
 
-# from ._regex_patterns import RecipeRegexPatterns
+from ._regex_patterns import RecipeRegexPatterns
 
 # # import for for local development
-from lambda_containers.extract_ingredients.recipe_parser import RecipeRegexPatterns
+# from lambda_containers.extract_ingredients.recipe_parser import RecipeRegexPatterns
 # from recipe_parser import RecipeRegexPatterns
 
 # OLD / LOCAL import statements 
@@ -59,8 +59,17 @@ class RecipeParser:
         self.reduced_ingredient  = None    # parenthesis removed from the ingredient string
         self.parenthesis_content = None  # content of the parenthesis removed from the ingredient string
 
-        self.best_quantity       = None    # the best quantity found in the ingredient string
-        self.best_unit           = None    # the best unit found in the ingredient string
+        self.quantity       = None    # the best quantity found in the ingredient string
+        self.unit           = None    # the best unit found in the ingredient string
+
+
+        # make member variables for seconday quantities and units
+        self.secondary_quantity = None
+        self.secondary_unit     = None
+
+        # "standard units" are the commonplace names for the found units (i.e. the standard unit of "oz" is "ounce")
+        self.standard_unit = None 
+        self.standard_secondary_unit = None
 
         # stash the best quantity and unit for testing/debugging
         self.stashed_quantity    = None 
@@ -86,6 +95,21 @@ class RecipeParser:
         
         return self.standard_ingredient
     
+    def _find_units(self, ingredient: str) -> List[str]:
+        """
+        Find units in the ingredient string.
+        Args:
+            ingredient (str): The ingredient string to parse.
+        Returns:
+            List[str]: A list of units found in the ingredient string.
+        """
+
+        # split the input string on whitespaces
+        split_ingredient = ingredient.split()
+
+        matched_units = [i for i in split_ingredient if i in self.regex.constants["UNITS"]]
+
+        return matched_units
     
     def _drop_special_dashes(self) -> None:
         # print("Dropping special dashes")
@@ -110,10 +134,11 @@ class RecipeParser:
 
         # Unescape HTML
         self.standard_ingredient = unescape(self.standard_ingredient)
-        # regex.UNICODE_FRACTIONS
+
         # Replace unicode fractions with their decimal equivalents
         for unicode_fraction, decimal_fraction in self.regex.constants["UNICODE_FRACTIONS"].items():
-            self.standard_ingredient = self.standard_ingredient.replace(unicode_fraction, decimal_fraction)
+            self.standard_ingredient = self.standard_ingredient.replace(unicode_fraction, f" {decimal_fraction}")
+            # self.standard_ingredient = self.standard_ingredient.replace(unicode_fraction, decimal_fraction)
 
     def _replace_unicode_fraction_slashes(self) -> None:
         """Replace unicode fraction slashes with standard slashes in the parsed ingredient."""
@@ -296,7 +321,7 @@ class RecipeParser:
         # all_ranges = re.findall(regex.QUANTITY_DASH_QUANTITY_UNIT, ingredient)
         # all_ranges = re.finditer(regex.QUANTITY_DASH_QUANTITY_UNIT, ingredient)
         
-        all_ranges = re.finditer(regex.QUANTITY_DASH_QUANTITY, self.standard_ingredient)
+        all_ranges = re.finditer(self.regex.QUANTITY_DASH_QUANTITY, self.standard_ingredient)
         # all_ranges = re.finditer(regex.QUANTITY_DASH_QUANTITY, ingredient)
 
         # initialize offset and replacement index values for updating the ingredient string, 
@@ -314,7 +339,7 @@ class RecipeParser:
             print(f"Match: {match.group()} at positions {start}-{end}") if self.debug else None
 
             # Get the range values from the match
-            range_values = re.findall(regex.QUANTITY_DASH_QUANTITY, match.group())
+            range_values = re.findall(self.regex.QUANTITY_DASH_QUANTITY, match.group())
 
             print(f"Range Values: {range_values}") if self.debug else None
             
@@ -432,6 +457,23 @@ class RecipeParser:
                 # print(f"----> REPEAT UNITS: {unit1}")
                 # print("\n")
     
+    def _remove_x_separators(self):
+        """
+        Remove "x" separators from the ingredient string and replace with whitespace
+        Examples:
+            >>> _removed_x_separators("1x2 cups")
+            '1 2 cups'
+            >>> _remove_x_separators("5 x cartons of eggs")
+            "5   cartons of eggs"
+        """
+
+        def replace_x(match):
+            return match.group().replace('x', ' ').replace('X', ' ')
+
+        # Replace "x"/"X" separators with whitespace
+        self.standard_ingredient = self.regex.X_AFTER_NUMBER.sub(replace_x, self.standard_ingredient)
+
+
     def _merge_spaced_numbers(self, spaced_numbers: str) -> str:
         """ Add or multiply the numbers in a string separated by a space.
         If the second number is less than 1, then add the two numbers together, otherwise multiply them together.
@@ -491,6 +533,86 @@ class RecipeParser:
 
         return add_or_multiply[0] if add_or_multiply else ""
     
+    def _merge_multi_nums2(self) -> None:
+        """
+        Replace unicode and standard fractions with their decimal equivalents in the parsed ingredient (v2).
+        Assumes that numeric values in string have been padded with a space between numbers and non numeric characters and
+        that any fractions have been converted to their decimal equivalents.
+        Args:
+            ingredient (str): The ingredient string to parse.
+        Returns:
+            str: The parsed ingredient string with the numbers separated by a space merged into a single number (either added or multiplied).
+        
+        >>> _merge_multi_nums('2 0.5 cups of sugar')
+        '2.5 cups of sugar'
+        >>> _merge_multi_nums('1 0.5 pounds skinless, boneless chicken breasts, cut into 0.5 inch pieces')
+        '1.5 pounds skinless, boneless chicken breasts, cut into 0.5 inch pieces'
+        """
+
+        # ingredient = '2 0.5 cups of sugar'
+        # ingredient = 'a lemon'
+        # ingredient = "1.5 lb of sugar"
+        # ingredient = '1 0.5 pounds skinless, boneless chicken breasts, cut into 0.5 inch pieces'
+
+        # # original ingred: "1½-2½cup of sugar"
+        # ingredient = '1 0.5 - 2 0.5 cup of sugar'
+        # ingredient = '1 0.5 - 2 0.5 of sugar'
+        # ingredient = '1 1/2 - 2 1/2 cup of sugar'
+
+        # go the spaced numbers matches and get each spaced seperated numbers match AND 
+        # try and get the units that follow them so we can correctly match each spaced number with its corresponding unit
+        spaced_nums = []
+        units = []
+
+        # Create iterable of the matched spaced numbers to insert updated values into the original string
+        spaced_matches = re.finditer(self.regex.SPACE_SEP_NUMBERS, self.standard_ingredient)
+        # spaced_matches = re.finditer(regex_map.SPACE_SEP_NUMBERS, ingredient)
+
+        # initialize offset and replacement index values for updating the ingredient string, 
+        # these will be used to keep track of the position of the match in the string
+        offset = 0
+        replacement_index = 0
+
+        # Update the ingredient string with the merged values
+        for match in spaced_matches:
+            # print(f"Ingredient string: {ingredient}")
+
+            # Get the start and end positions of the match
+            start, end = match.start(), match.end()
+
+            # search for the first unit that comes after the spaced numbers
+            unit_after_match = re.search(self.regex.UNITS_PATTERN,  self.standard_ingredient[end:])
+            # unit_after_match = re.search(regex_map.UNITS_PATTERN, ingredient[end:])
+            
+            if unit_after_match:
+                print(f"unit after match: > '{unit_after_match.group()}'")
+                units.append(unit_after_match.group())
+
+            # add the spaced number to the list
+            spaced_nums.append(match.group())
+
+            # print(f"Match: {match.group()} at positions {start}-{end}")
+            merged_quantity = self._merge_spaced_numbers(match.group())
+            merge_operation = self._which_merge_on_spaced_numbers(match.group())
+
+            print(f"merged_quantity: {merged_quantity}") if self.debug else None
+            print(f"merge_operation: {merge_operation}\n") if self.debug else None
+
+            # Calculate the start and end positions in the modified string
+            modified_start = start + offset
+            modified_end = end + offset
+
+            # print(f" -> Modified match positions: {modified_start}-{modified_end}")
+            print(f"Replacing {match.group()} with '{merged_quantity}'...") if self.debug else None
+            
+            # Construct the modified string with the replacement applied
+            self.standard_ingredient = self.standard_ingredient[:modified_start] + str(merged_quantity) + self.standard_ingredient[modified_end:]
+            # ingredient = ingredient[:modified_start] + str(merged_quantity) + ingredient[modified_end:]
+
+            # Update the offset for subsequent replacements
+            offset += len(merged_quantity) - (end - start)
+            replacement_index += 1
+
     def _merge_multi_nums(self) -> None:
         """
         Replace unicode and standard fractions with their decimal equivalents in the parsed ingredient.
@@ -512,7 +634,12 @@ class RecipeParser:
         # ingredient = "1.5 lb of sugar"
         # ingredient = '1 0.5 pounds skinless, boneless chicken breasts, cut into 0.5 inch pieces'
 
+        # # original ingred: "1½-2½cup of sugar"
+        # ingredient = '1 0.5 - 2 0.5 cup of sugar'
+        # ingredient = '1 1/2 - 2 1/2 cup of sugar'
+        
         # get the units from the ingredient string
+        # units = re.findall(regex_map.UNITS_PATTERN, ingredient)
         units = re.findall(self.regex.UNITS_PATTERN, self.standard_ingredient)
 
         # spaced_nums = re.findall(regex.SPACE_SEP_NUMBERS, '2 0.5 cups of sugar 3 0.5 lbs of carrots')
@@ -803,19 +930,7 @@ class RecipeParser:
         # get the first unit in the ingredient string
         first_unit = self.found_units["units"][0] if self.found_units["units"] else ""
 
-        # return the first unit
         return first_unit
-    
-    def _pull_first_unit2(self): 
-        """
-        Pull out the first unit in the string
-        Returns the first unit found in the ingredient string.
-        """
-        # get the first unit in the ingredient string
-        first_unit = self.regex.UNITS_PATTERN.search(self.reduced_ingredient)
-
-        # return the first unit
-        return first_unit.group() if first_unit else "" 
     
     def standardize(self):
         
@@ -827,9 +942,12 @@ class RecipeParser:
             self._replace_unicode_fraction_slashes,
             self._convert_fractions_to_decimals,
             self._fix_ranges,
+            # self._remove_x_separators,
             self._force_ws,
             self._remove_repeat_units,
-            self._merge_multi_nums,
+            self._remove_x_separators,
+            # self._merge_multi_nums,
+            self._merge_multi_nums2,
             self._replace_a_or_an_units,
             self._avg_ranges,
             self._separate_parenthesis,
@@ -854,13 +972,13 @@ class RecipeParser:
 
         """
         Extract the first unit and quantity from an ingredient string.
-        Function will extract the first unit and quantity from the ingredient string and set the self.best_quantity and self.best_unit member variables.
+        Function will extract the first unit and quantity from the ingredient string and set the self.quantity and self.unit member variables.
         Quantities and ingredients are extracted in this order and if any of the previous steps are successful, the function will return early.
         1. Check for basic units (e.g. 1 cup, 2 tablespoons)
         2. Check for nonbasic units (e.g. 1 fillet, 2 carrot sticks)
         3. Check for quantity only, no units (e.g. 1, 2)
 
-        If none of the above steps are successful, then the self.best_quantity and self.best_unit member variables will be set to None.
+        If none of the above steps are successful, then the self.quantity and self.unit member variables will be set to None.
 
         Args:
             ingredient (str): The ingredient string to parse.
@@ -896,11 +1014,11 @@ class RecipeParser:
         print(basic_units_message)
         # print(basic_units_message) if self.debug else None
 
-        # if we have valid single number quantities, then set the self.best_quantity and the self.best_unit member variables and exit the function
+        # if we have valid single number quantities, then set the self.quantity and the self.unit member variables and exit the function
         if basic_unit_matches and valid_basic_units:
-            self.best_quantity = valid_basic_units[0][0].strip()
-            self.best_unit = valid_basic_units[0][1].strip()
-            # return {"quantity": self.best_quantity, "unit": self.best_unit}
+            self.quantity = valid_basic_units[0][0].strip()
+            self.unit = valid_basic_units[0][1].strip()
+            # return {"quantity": self.quantity, "unit": self.unit}
             return 
 
         # ---- STEP 2: CHECK FOR QUANTITY - NONBASIC UNITS (e.g. 1 fillet, 2 carrot sticks) ----
@@ -918,11 +1036,11 @@ class RecipeParser:
         print(nonbasic_units_message)
         # print(nonbasic_units_message) if self.debug else None
 
-        # if we found a number followed by a non basic unit, then set the self.best_quantity and the self.best_unit member variables and exit the function
+        # if we found a number followed by a non basic unit, then set the self.quantity and the self.unit member variables and exit the function
         if nonbasic_unit_matches and valid_nonbasic_units:
-            self.best_quantity = valid_nonbasic_units[0][0].strip()
-            self.best_unit = valid_nonbasic_units[0][1].strip()
-            # return {"quantity": self.best_quantity, "unit": self.best_unit}
+            self.quantity = valid_nonbasic_units[0][0].strip()
+            self.unit = valid_nonbasic_units[0][1].strip()
+            # return {"quantity": self.quantity, "unit": self.unit}
             return
         
         # ---- STEP 3: CHECK FOR ANY QUANTITIES or ANY UNITS in the string, and use the first instances (if they exist) ----
@@ -950,9 +1068,9 @@ class RecipeParser:
         # the first valid quantity and units found, otherwise set as None
         # TODO: Drop this "if valid_quantities or valid_units"...?
         if valid_quantities or valid_units:
-            self.best_quantity = valid_quantities[0].strip() if valid_quantities else None
-            self.best_unit = valid_units[0].strip() if valid_units else None
-            # return {"quantity": self.best_quantity, "unit": self.best_unit}
+            self.quantity = valid_quantities[0].strip() if valid_quantities else None
+            self.unit = valid_units[0].strip() if valid_units else None
+            # return {"quantity": self.quantity, "unit": self.unit}
             return
 
         # # ---- STEP 3: CHECK FOR QUANTITY - NO UNITS (e.g. 1, 2) ----
@@ -968,8 +1086,8 @@ class RecipeParser:
         # # print(quantity_only_message) if self.debug else None
         # # if we have valid single number quantities, then return the first one
         # if quantity_matches and valid_quantities:
-        #     self.best_quantity = valid_quantities[0].strip()
-        #     # return {"quantity": self.best_quantity, "unit": self.best_unit}
+        #     self.quantity = valid_quantities[0].strip()
+        #     # return {"quantity": self.quantity, "unit": self.unit}
         #     return
             
         # # ---- STEP 4: UNITS ONLY ----
@@ -982,7 +1100,7 @@ class RecipeParser:
         no_matches_message = f"No valid quantities or units found..."
         print(no_matches_message)
         # print(no_matches_message) if self.debug else None
-        # return {"quantity": self.best_quantity, "unit": self.best_unit}
+        # return {"quantity": self.quantity, "unit": self.unit}
         return 
     
     def _check_if_required_parenthesis(self, parenthesis_list: list) -> bool:
@@ -1060,28 +1178,21 @@ class RecipeParser:
     def _address_quantity_only_parenthesis(self, parenthesis: str) -> None:
         """
         Address the case where the parenthesis content only contains a quantity.
-        Updates the member variables "quantity", "unit", and "description" based on the content of the parenthesis.
+        Attempts to update self.quantity, self.unit, self.secondary_quantity, and self.secondary_unit given 
+        information from the parenthesis string and the current self.quantity and self.unit
+        (e.g. "(3)", "(2.5)", "(1/2)")
         Args:
             parenthesis (str): The content of the parenthesis in the ingredient string.
 
         Returns:
             None
         """
-
-        # unit = parser.best_unit
-        # quantity = parser.best_quantity
-        # reduced = parser.reduced_ingredient
-        # parenthesis = parser.parenthesis_content
-
+        
         print(f"""
         Ingredient: '{self.reduced_ingredient}'
         Parenthesis: '{parenthesis}'
-        self.best_quantity: '{self.best_quantity}'
-        Unit: '{self.best_unit}'""")
-
-        # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
-
-        # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
+        self.quantity: '{self.quantity}'
+        Unit: '{self.unit}'""") if self.debug else None
         
         # Set a None Description
         description = None
@@ -1092,175 +1203,199 @@ class RecipeParser:
         
         # if no numbers only parenthesis, then just return the original ingredient
         if not numbers_only:
-            # return [self.best_quantity, self.best_unit, description]
+            print(f"\n > Return early from QUANTITY parenthesis") if self.debug else None
             description = f"not a quantity only parenthesis"
             self.parenthesis_notes.append(description)
             return
 
-        # pull out the self.best_quantity from the parenthesis
+        # pull out the self.quantity from the parenthesis
         parenthesis_quantity = numbers_only[0]
 
         # if there is not a unit or a quantity, then we can use the parenthesis number as the quantity and
         #  return the ingredient with the new quantity
         # TODO: OR the unit MIGHT be the food OR might be a "SOMETIMES_UNIT", maybe do that check here, not sure yet...
-        if not self.best_quantity and not self.best_unit:
-            # updated_quantity = numbers_only[0]
+        if not self.quantity and not self.unit:
             description = f"maybe unit is: the 'food' or a 'sometimes unit'"
             self.parenthesis_notes.append(description)
-            self.best_quantity = parenthesis_quantity
-            # return [parenthesis_quantity, self.best_unit, description]
+
+            self.quantity = parenthesis_quantity
             return
         
         # if there is a quantity but no unit, we can try to merge (multiply) the current quantity and the parenthesis quantity 
         # then the unit is also likely the food 
         # TODO: OR the unit MIGHT be the food OR might be a "SOMETIMES_UNIT", maybe do that check here, not sure yet...
-        if self.best_quantity and not self.best_unit:
-            updated_quantity = str(float(self.best_quantity) * float(parenthesis_quantity))
+        if self.quantity and not self.unit:
+            updated_quantity = str(float(self.quantity) * float(parenthesis_quantity))
             
             description = f"maybe unit is: the 'food' or a 'sometimes unit'"
             self.parenthesis_notes.append(description)
-            self.best_quantity = updated_quantity
+
+            # set the secondary quantity to the ORIGINAL quantity/units
+            self.secondary_quantity = self.quantity 
+
+            # Update the quantity with the updated merged quantity
+            self.quantity = updated_quantity
             
-            # return [updated_quantity, self.best_unit, description]
+            # return [updated_quantity, self.unit, description]
             return
         
         # if there is a unit but no quantity, then we can use the parenthesis number as the quantity and 
         # return the ingredient with the new quantity
-        if not self.best_quantity and self.best_unit:
+        if not self.quantity and self.unit:
             # updated_quantity = numbers_only[0]
             description = f"used quantity from parenthesis"
             self.parenthesis_notes.append(description)
-            self.best_quantity = parenthesis_quantity
 
-            # return [parenthesis_quantity, self.best_unit, description]
+            # set the secondary quantity to the ORIGINAL quantity/units
+            self.secondary_quantity = self.quantity 
+
+            # set the quantity to the parenthesis quantity
+            self.quantity = parenthesis_quantity
+
             return
+
         # if there is a quantity and a unit, then we can try
         # to merge (multiply) the current quantity and the parenthesis quantity
         # then return the ingredient with the new quantity
-        if self.best_quantity and self.best_unit:
+        if self.quantity and self.unit:
             # if there is a quantity and a unit, then we can try to merge (multiply) the current quantity and the parenthesis quantity
             # then return the ingredient with the new quantity
 
             description = f"multiplied starting quantity with parenthesis quantity"
             self.parenthesis_notes.append(description)
 
-            updated_quantity = str(float(quantity) * float(parenthesis_quantity))
-            self.best_quantity = updated_quantity
-            # return [updated_quantity, self.best_unit, description]
+            updated_quantity = str(float(self.quantity) * float(parenthesis_quantity))
+
+            # set the secondary quantity to the ORIGINAL quantity/units
+            self.secondary_quantity = self.quantity 
+
+            # Update the quantity with the updated merged quantity (original quantity * parenthesis quantity)
+            self.quantity = updated_quantity
+
             return
 
         description = f"used quantity from parenthesis with quantity only"
         self.parenthesis_notes.append(description)
-        self.best_quantity = parenthesis_quantity
-            
-        # return [parenthesis_quantity, self.best_unit, description]
+        
+        # set the secondary quantity to the ORIGINAL quantity/units
+        self.secondary_quantity = self.quantity 
+
+        # update the quantity with the parenthesis quantity value
+        self.quantity = parenthesis_quantity
+
         return
     
     def _address_equivalence_parenthesis(self, parenthesis: str) -> None:
         """
-        Address the case where the parenthesis content contains exactly a quantity and unit only
+        Address the case where the parenthesis content contains any equivalence strings like "about" or "approximately", followed by a quantity and then a unit later in the sting.
+        Attempts to update self.quantity, self.unit, self.secondary_quantity, and self.secondary_unit given 
+        information from the parenthesis string and the current self.quantity and self.unit
+        e.g. "(about 3 ounces)", "(about a 1/3 cup)", "(approximately 1 large tablespoon)"
+
         Args:
-            ingredient (str): The ingredient string to parse.
+            parenthesis (str): A string containing parenthesis from the ingredients string
         Returns:
-            List[str]: List of strings containing [updated quantity, updated unit, and description]
+            None
         """
 
-        # unit = parser.best_unit
-        # quantity = parser.best_quantity
-        # ingredient = parser.reduced_ingredient
-        # parenthesis = parser.parenthesis_content
 
         print(f"""
-        Ingredient: '{ingredient}'
+        Ingredient: '{self.reduced_ingredient}'
         Parenthesis: '{parenthesis}'
-        Quantity: '{self.best_quantity}'
-        Unit: '{self.best_unit}'""")
-
-        # parenthesis
-        # regex.print_matches("(8- dfs ounces)")
-        # regex.print_matches(parenthesis[0])
-        # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
-
-        # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
-        # [regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] 
-        # [regex.QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
-        # [QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
+        Quantity: '{self.quantity}'
+        Unit: '{self.unit}'""") if self.debug else None
         
         # Set a None Description
         description = None
 
         # check for the equivelency pattern (e.g. "<equivelent string> <quantity> <unit>" )
-        equivalent_quantity_unit = regex.EQUIV_QUANTITY_UNIT_GROUPS.findall(parenthesis)
+        equivalent_quantity_unit = self.regex.EQUIV_QUANTITY_UNIT_GROUPS.findall(parenthesis)
         # equivalent_quantity_unit = [item for i in [regex.EQUIV_QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] for item in i]
 
-        # if there is NO equivelence quantity unit matches, then just return the original ingredient
-        if not equivalent_quantity_unit:
+        # remove parenthesis and then split on whitespace
+        split_parenthesis = parenthesis.replace("(", "").replace(")", "").split()
+
+        # Case when: NO equivelence quantity unit matches 
+        #           OR parenthesis contains a quantity per unit like string in the parenthesis (i.e. "(about 2 ounces each)" contains "each")
+        # Then return early with NO UPDATES and keep the current quantity/unit as is
+        if not equivalent_quantity_unit or any([True if i in self.regex.constants["QUANTITY_PER_UNIT_STRINGS"] else False for i in split_parenthesis]):
+            print(f"\n > Return early from EQUIVALENCE parenthesis") if self.debug else None
             description = f"not a equivalence quantity unit parenthesis"
             self.parenthesis_notes.append(description)
-            # return [self.best_quantity, self.best_unit, description]
             return
         
         # pull out the suffix word, parenthesis quantity and unit
         parenthesis_suffix, parenthesis_quantity, parenthesis_unit = equivalent_quantity_unit[0]
-
-        # if no quantity AND no unit, then we can use the parenthesis quantity-unit as our quantity and unit
-        if not self.best_quantity and not self.best_unit:
-            # updated_quantity, updated_unit = quantity_unit_only[0]
-            # [item for i in list(quantity_unit_only[0][1:]) for item in i]
+        
+        # Case when: NO quantity, NO unit:
+            # if no quantity AND no unit, then we can use the parenthesis quantity-unit as our quantity and unit
+        if not self.quantity and not self.unit:
 
             description = f"used equivalence quantity unit as our quantity and unit"
             self.parenthesis_notes.append(description)
 
-            self.best_quantity = parenthesis_quantity
-            self.best_unit = parenthesis_unit
+            # set quantity/unit to the parenthesis values
+            self.quantity = parenthesis_quantity
+            self.unit = parenthesis_unit
 
-            # return [parenthesis_quantity, parenthesis_unit, description]
             return
         
-        # if there is a quantity but no unit, we can assume the equivelent quantity units 
-        # in the parenthesis are actually a better fit for the quantities and units so 
-        # we can use those are our quantities/units and then stash the original quantity in the "description" field 
-        # with a "maybe quantity is " prefix in front of the original quantity for maybe use later on
-        if self.best_quantity and not self.best_unit:
+        # Case when: YES quantity, NO unit:
+            # we can assume the equivelent quantity units 
+            # in the parenthesis are actually a better fit for the quantities and units so 
+            # we can use those are our quantities/units and then stash the original quantity in the "description" field 
+            # with a "maybe quantity is " prefix in front of the original quantity for maybe use later on
+        if self.quantity and not self.unit:
 
             # stash the old quantity with a trailing string before changing best_quantity
-            description = f"maybe quantity is: {' '.join(self.best_quantity)}"
+            description = f"maybe quantity is: {' '.join(self.quantity)}"
             self.parenthesis_notes.append(description)
 
-            self.best_quantity = parenthesis_quantity
-            self.best_unit = parenthesis_unit
+            # make the secondary_quantity the starting quantity before converting the quantity to the value found in the parenthesis
+            self.secondary_quantity = self.quantity
 
-            # return [parenthesis_quantity, parenthesis_unit, description]
+            # set the quantity/unit to the parenthesis values
+            self.quantity = parenthesis_quantity
+            self.unit = parenthesis_unit
+
             return 
 
-        # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are probably "better" so use the
-        # parenthesis quantity/units and then stash the old unit in the description
-        if not self.best_quantity and self.best_unit:
+        # Case when: NO quantity, YES unit:
+            # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are probably "better" so use the
+            # parenthesis quantity/units and then stash the old unit in the description
+        if not self.quantity and self.unit:
 
             # stash the old quantity with a trailing "maybe"
-            description = f"maybe unit is: {self.best_unit}"
+            description = f"maybe unit is: {self.unit}"
             self.parenthesis_notes.append(description)
 
-            self.best_quantity = parenthesis_quantity
-            self.best_unit = parenthesis_unit
+            # make the secondary_unit the starting unit before converting the unit to the unit string found in the parenthesis
+            self.secondary_unit = self.unit
+
+            self.quantity = parenthesis_quantity
+            self.unit = parenthesis_unit
 
             # return [parenthesis_quantity, parenthesis_unit, description]
             return 
+        
+        # Case when: YES quantity, YES unit:
+            # if we already have a quantity AND a unit, then we likely found an equivalent quantity/unit
+            # we will choose to use the quantity/unit pairing that is has a unit in the BASIC_UNITS_SET
+        if self.quantity and self.unit:
+            parenthesis_unit_is_basic = parenthesis_unit in self.regex.constants["BASIC_UNITS_SET"]
+            unit_is_basic = self.unit in self.regex.constants["BASIC_UNITS_SET"]
 
-        # if we already have a quantity AND a unit, then we likely found an equivalent quantity/unit
-        # we will choose to use the quantity/unit pairing that is has a unit in the BASIC_UNITS_SET
-        # Case when BOTH are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
-        # Case when NEITHER are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
-        if self.best_quantity and self.best_unit:
-            parenthesis_unit_is_basic = parenthesis_unit in regex.constants["BASIC_UNITS_SET"]
-            unit_is_basic = self.best_unit in regex.constants["BASIC_UNITS_SET"]
-
-            # Case when BOTH are basic units: 
+            # Case when BOTH are basic units:  (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
             #   use the original quantity/unit (stash the parenthesis in the description)
             if parenthesis_unit_is_basic and unit_is_basic:
                 description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
                 self.parenthesis_notes.append(description)
-                # return [self.best_quantity, self.best_unit, description]
+                # return [self.quantity, self.unit, description]
+
+                # set the secondary quantity/units to the values in the parenthesis
+                self.secondary_quantity = parenthesis_quantity
+                self.secondary_unit = parenthesis_unit
+
                 return
             
             # Case when NEITHER are basic units:    # TODO: this can be put into the above condition but thought separated was more readible.
@@ -1268,42 +1403,317 @@ class RecipeParser:
             if not parenthesis_unit_is_basic and not unit_is_basic:
                 description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
                 self.parenthesis_notes.append(description)
-                # return [self.best_quantity, self.best_unit, description]
+                # return [self.quantity, self.unit, description]
+                
+                # set the secondary quantity/units to the values in the parenthesis
+                self.secondary_quantity = parenthesis_quantity
+                self.secondary_unit = parenthesis_unit
+
                 return
 
-            # Case when the parenthesis unit is a basic unit (original is NOT basic unit): 
+            # Case when: YES basic parenthesis unit, NO basic original unit: 
             #   then use the parenthesis quantity/unit (stash the original in the description)
             if parenthesis_unit_is_basic:
-                description = f"maybe quantity/unit is: {self.best_quantity}/{self.best_unit}"
+                description = f"maybe quantity/unit is: {self.quantity}/{self.unit}"
                 self.parenthesis_notes.append(description)
+                
+                # set the secondary quantity/units to the original quantity/units
+                self.secondary_quantity = self.quantity
+                self.secondary_unit = self.unit
 
-                self.best_quantity = parenthesis_quantity
-                self.best_unit = parenthesis_unit
+                # update the primary quantities/units to the parenthesis values
+                self.quantity = parenthesis_quantity
+                self.unit = parenthesis_unit
                 
                 # return [parenthesis_quantity, parenthesis_unit, description]
                 return
-            
-            # Case when the original unit is a basic unit (parenthesis is NOT basic unit): 
+
+            # Case when: NO basic parenthesis unit, YES basic original unit: 
             #   then use the original quantity/unit (stash the parenthesis in the description)
-            if parenthesis_unit_is_basic:
-                description = f"maybe quantity/unit is: {self.best_quantity}/{self.best_unit}"
+            if unit_is_basic:
+                description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
                 self.parenthesis_notes.append(description)
 
-                self.best_quantity = parenthesis_quantity
-                self.best_unit = parenthesis_unit
+                # set the secondary quantity/units to the original quantity/units
+                self.secondary_quantity = parenthesis_quantity
+                self.secondary_unit = parenthesis_unit
 
-                # return [parenthesis_quantity, parenthesis_unit, description]
                 return
 
-        # return [quantity, unit, description]
         description = f"used quantity/units from parenthesis with equivalent quantity/units"
         self.parenthesis_notes.append(description)
 
-        self.best_quantity = parenthesis_quantity
-        self.best_unit = parenthesis_unit
-        # return [parenthesis_quantity, parenthesis_unit, description]
+        # set the secondary quantity/units to the original quantity/units
+        self.secondary_quantity = self.quantity
+        self.secondary_unit = self.unit
+
+        self.quantity = parenthesis_quantity
+        self.unit = parenthesis_unit
+
         return
     
+    def _address_quantity_unit_only_parenthesis(self, parenthesis: str) -> None:
+        """
+        Address the case where the parenthesis content contains exactly a quantity and unit (NOT prefixed by any equivalence strings like "about" or "approximately").
+        Attempts to update self.quantity, self.unit, self.secondary_quantity, and self.secondary_unit given 
+        information from the parenthesis string and the current self.quantity and self.unit
+        e.g. "(3 ounces)", "(3 ounces each)", "(a 4 cup scoop)"
+
+        Args:
+            parenthesis (str): A string containing parenthesis from the ingredients string
+        Returns:
+            None
+        """
+
+
+        print(f"""
+        Ingredient: '{self.reduced_ingredient}'
+        Parenthesis: '{parenthesis}'
+        Quantity: '{self.quantity}'
+        Unit: '{self.unit}'""") if self.debug else None
+
+        # Set a None Description
+        description = None
+
+        # pull out quantity unit only pattern
+        quantity_unit_only = self.regex.QUANTITY_UNIT_GROUPS.findall(parenthesis)
+        # quantity_unit_only = [item for i in [self.regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] for item in i]
+
+        # if no numbers only parenthesis, then just return the original ingredient
+        if not quantity_unit_only:
+            print(f"\n > Return early from QUANTITY UNIT parenthesis") if self.debug else None
+            description = f"not a quantity unit only parenthesis"
+            self.parenthesis_notes.append(description)
+            # return [self.quantity, unit, description]
+            return
+        
+        # pull out the parenthesis quantity and unit
+        parenthesis_quantity, parenthesis_unit = quantity_unit_only[0]
+
+        # Case when: NO quantity, NO unit:
+            # if no quantity AND no unit, then we can use the parenthesis self.quantity-unit as our self.quantity and unit
+        if not self.quantity and not self.unit:
+            # updated_quantity, updated_unit = quantity_unit_only[0]
+            print(f"\n > Case when: NO quantity, NO unit") if self.debug else None
+
+            description = f"used quantity/unit from parenthesis with no quantity/unit"
+            self.parenthesis_notes.append(description)
+
+            # set the secondary quantity/units to the original quantity/units
+            self.secondary_quantity = self.quantity
+            self.secondary_unit = self.unit
+
+            self.quantity = parenthesis_quantity
+            self.unit = parenthesis_unit
+
+            # return [parenthesis_quantity, parenthesis_unit, description]
+            return
+
+        # Case when: YES quantity, NO unit:
+            # if there is a quantity but no unit, we can try to merge (multiply) the current quantity and the parenthesis quantity 
+            # then use the unit in the parenthesis
+        if self.quantity and not self.unit:
+            print(f"\n > Case when: YES quantity, NO unit") if self.debug else None
+
+            # quantity_unit_only[0][0]
+            updated_quantity = str(float(self.quantity) * float(parenthesis_quantity))
+
+            description = f"multiplied starting quantity with parenthesis quantity"
+            self.parenthesis_notes.append(description)
+
+            # set the secondary quantity/units to the original quantity/units
+            self.secondary_quantity = self.quantity
+            self.secondary_unit = self.unit
+            
+            self.quantity = updated_quantity
+            self.unit = parenthesis_unit
+
+            # return [updated_quantity, parenthesis_unit, description]
+            return
+
+        # Case when: NO quantity, YES unit:
+            # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are either:
+            # 1. A description/note (i.e. cut 0.5 inch slices)
+            # 2. A quantity and unit (i.e. 2 ounces)
+            # either case, just return the parenthesis units to use those
+        if not self.quantity and self.unit:
+            print(f"\n > Case when: NO quantity, YES unit") if self.debug else None
+
+            description = f"No quantity but has units, used parenthesis. maybe quantity/unit is: {self.quantity}/{self.unit}"
+            self.parenthesis_notes.append(description)
+
+            # set the secondary quantity/units to the original quantity/units
+            self.secondary_quantity = self.quantity
+            self.secondary_unit = self.unit
+
+            self.quantity = parenthesis_quantity
+            self.unit = parenthesis_unit
+
+            # return [parenthesis_quantity, parenthesis_unit, description]
+            return
+
+        # # Case when: YES quantity, YES unit:
+        #     # if we already have a quantity AND a unit, then we likely just found a description and that is all.
+        # if self.quantity and self.unit:
+        #     # use the parenthesis values as a description and join the values together 
+        #     description = f"maybe quantity/unit is: {' '.join(quantity_unit_only[0])}"
+        #     self.parenthesis_notes.append(description)
+        #     # return [self.quantity, unit, description]
+        #     return
+
+        # Case when: YES quantity, YES unit:
+            # if we already have a quantity AND a unit, then we likely just found a description 
+            # OR we may have found an equivalence quantity unit.
+            # we will choose to use the quantity/unit pairing that is has a unit in the BASIC_UNITS_SET
+        if self.quantity and self.unit:
+            print(f"\n > Case when: YES quantity, YES unit") if self.debug else None
+
+            # flags for if original unit/parenthesis unit are in the set of basic units (BASIC_UNITS_SET) or not
+            parenthesis_unit_is_basic = parenthesis_unit in self.regex.constants["BASIC_UNITS_SET"]
+            unit_is_basic = self.unit in self.regex.constants["BASIC_UNITS_SET"]
+
+            # Case when BOTH are basic units: 
+            #   use the original quantity/unit (stash the parenthesis in the description)
+            if parenthesis_unit_is_basic and unit_is_basic:
+                print(f"\n >>> Case when: BASIC parenthesis unit, BASIC unit") if self.debug else None
+
+                description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
+                self.parenthesis_notes.append(description)
+
+                # set the secondary quantity/units to the parenthesis quantity/units
+                self.secondary_quantity = parenthesis_quantity
+                self.secondary_unit = parenthesis_unit
+                return
+            
+            # Case when NEITHER are basic units:    # TODO: this can be put into the above condition but thought separated was more readible.
+            #   use the original quantity/unit AND set the secondary quantity/units to the PARENTHESIS values 
+            #   (stash the parenthesis in the description)
+            if not parenthesis_unit_is_basic and not unit_is_basic:
+                print(f"\n >>> Case when: NOT BASIC parenthesis unit, NOT BASIC unit") if self.debug else None
+                description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
+                self.parenthesis_notes.append(description)
+
+                # set the secondary quantity/units to the parenthesis quantity/units
+                self.secondary_quantity = parenthesis_quantity
+                self.secondary_unit = parenthesis_unit
+                return
+
+            # Case when: YES basic parenthesis unit, NO basic original unit (EXPLICIT):
+            #  Try to merge (multiply) the current quantity and the parenthesis quantity
+            #  AND set the secondary quantity/units to the ORIGINAL values
+            if parenthesis_unit_is_basic and not unit_is_basic:
+                print(f"\n >>> Case when: BASIC parenthesis unit, NOT BASIC unit (EXPLICIT)") if self.debug else None
+                updated_quantity = str(float(self.quantity) * float(parenthesis_quantity))
+
+                description = f"multiplied starting quantity with parenthesis quantity"
+                self.parenthesis_notes.append(description)
+
+                # set the secondary quantity/units to the original quantity/units
+                self.secondary_quantity = self.quantity
+                self.secondary_unit = self.unit
+
+                self.quantity = updated_quantity
+                self.unit = parenthesis_unit
+
+                return
+
+            # TODO: I think this condition can be dropped, gets covered by previous condition...
+            # Case when: YES basic parenthesis unit, NO basic original unit (IMPLICITLY): 
+            #   then use the parenthesis quantity/unit AND set the secondary quantity/units to the ORIGINAL values
+            #   (stash the original in the description)
+            if parenthesis_unit_is_basic:
+                print(f"\n >>> Case when: BASIC parenthesis unit, NOT BASIC unit (IMPLICIT)") if self.debug else None
+                description = f"maybe quantity/unit is: {self.quantity}/{self.unit}"
+                self.parenthesis_notes.append(description)
+
+                # set the secondary quantity/units to the original quantity/units
+                self.secondary_quantity = self.quantity
+                self.secondary_unit = self.unit
+
+                self.quantity = parenthesis_quantity
+                self.unit = parenthesis_unit
+
+                return
+
+            # Case when: NO basic parenthesis unit, YES basic original unit: 
+            #   then just keep the original quantity/unit AND set the secondary quantity/units to the PARENTHESIS values
+            #   (stash the original in the description)
+            if unit_is_basic:
+                print(f"\n >>> Case when: NOT BASIC parenthesis unit, BASIC unit (IMPLICIT)") if self.debug else None
+                description = f"maybe quantity/unit is: {self.quantity}/{self.unit}"
+                self.parenthesis_notes.append(description)
+
+                # set the secondary quantity/units to the parenthesis quantity/units
+                self.secondary_quantity = parenthesis_quantity
+                self.secondary_unit = parenthesis_unit
+
+                return
+        
+        print(f"\n ----> Case when: ALL OTHER CASES FAILED") if self.debug else None
+
+        # TODO: Don't think this should ever happen, need to rethink this part
+        # Case when: All other conditions were NOT met:
+            # just set the quantity/unit to the parenthesis values 
+            # and then put the original quantity/units in the secondary quantity/units
+        description = f"used quantity/units from parenthesis with quantity/units only"
+        self.parenthesis_notes.append(description)
+
+        # set the secondary quantity/units to the ORIGINAL quantity/units
+        self.secondary_quantity = self.quantity 
+        self.secondary_unit = self.unit
+
+        # set the primary quantity/units to the parenthesis quantity/units
+        self.quantity = parenthesis_quantity
+        self.unit = parenthesis_unit
+
+        return
+    
+    def _add_standard_units(self) -> None:
+        """
+        Add standard units to the parsed ingredient if they are present in the
+        constants units to standard units map.
+        If the "unit"/"secondary_unit" exists and it is present in the unit to standard unit map, 
+        then get the standard unit name for the unit and set the "standard_unit" and "standard_secondary_unit" member variables.
+        """
+
+        if self.unit and self.unit in self.regex.constants["UNIT_TO_STANDARD_UNIT"]:
+            self.standard_unit = self.regex.constants["UNIT_TO_STANDARD_UNIT"][self.unit]
+        
+        if self.secondary_unit and self.secondary_unit in self.regex.constants["UNIT_TO_STANDARD_UNIT"]:
+            self.standard_secondary_unit = self.regex.constants["UNIT_TO_STANDARD_UNIT"][self.secondary_unit]
+
+        return 
+    
+    def _prioritize_weight_units(self) -> None:
+        """
+        Prioritize weight units over volume units if both are present in the parsed ingredient.
+        If the first unit is not a weight unit but the secondary_unit is a weight unit, then swap them so 
+        the weight unit is always given as the primary unit.
+        (i.e. unit = "cups", secondary_unit = "ounces" --> Swap them so that unit = "ounces" and secondary_unit = "cups")
+        """
+
+        # # if the first unit is already a weight, just return early
+        if self.unit in self.regex.constants["WEIGHT_UNITS_SET"]:
+            return 
+        
+        # TODO: first part of this if statement is probably redundent...
+        # if the first unit is NOT a weight and the second unit IS a weight, then swap them
+        if self.unit not in self.regex.constants["WEIGHT_UNITS_SET"] and self.secondary_unit in self.regex.constants["WEIGHT_UNITS_SET"]:
+
+            print(f"Swapping first quantity/units with second quantity/units")
+            # print(f"Swapping first quantity/units with second quantity/units") if self.debug else None
+
+            # switch the units and quantities with the secondary units and quantities
+            self.quantity, self.secondary_quantity = self.secondary_quantity, self.quantity
+            self.unit, self.secondary_unit = self.secondary_unit,  self.unit
+            self.standard_unit, self.standard_secondary_unit = self.standard_secondary_unit, self.standard_unit
+
+            # parsed_obj["quantity"], parsed_obj["secondary_quantity"] = parsed_obj["secondary_quantity"], parsed_obj["quantity"]
+            # parsed_obj["unit"], parsed_obj["secondary_unit"] = parsed_obj["secondary_unit"], parsed_obj["unit"]
+            # parsed_obj["standard_unit"], parsed_obj["standard_secondary_unit"] = parsed_obj["standard_secondary_unit"], parsed_obj["standard_unit"]
+        
+        return 
+
     def parse(self):
         # TODO: process parenthesis content
 
@@ -1347,42 +1757,122 @@ class RecipeParser:
         # NOTE: Stash the best_quantity and best_units before preceeding (for debugging)
 
         # stash the best quantity and unit for testing/debugging
-        self.stashed_quantity    = self.best_quantity 
-        self.stashed_unit        = self.best_unit
+        self.stashed_quantity    = self.quantity 
+        self.stashed_unit        = self.unit
+
+        print()
+        print(f"CHECKING INGREDIENT AFTER STASH: {self.ingredient}")
+        print(f"Ingredient: {self.ingredient}")
+        print(f" > Standard ingredient: {self.standard_ingredient}")
+        print(f"   > Stashed Quantity ingredient: {self.stashed_quantity}")
+        print(f"   > Stashed unit ingredient: {self.stashed_unit}")
+        print(f"   > Parenthesis content: {self.parenthesis_content}")
+        print()
 
         # loop through each of the parenthesis in the parenthesis content and apply address_parenthesis functions 
         for parenthesis in self.parenthesis_content:
-            print(f"Addressing parenthesis: '{parenthesis}'")
-            # print(f"Addressing parenthesis: '{parenthesis}'") if self.debug else None
+            print(f"Addressing parenthesis: '{parenthesis}'") if self.debug else None
+
             # address the case where the parenthesis content only contains a quantity
+            print(f"> Apply QUANTITY Parenthesis to: '{self.quantity} {self.unit}'") if self.debug else None
             self._address_quantity_only_parenthesis(parenthesis)
+            
+            print(f"> Apply EQUIVALENCE Parenthesis to: '{self.quantity} {self.unit}'") if self.debug else None
             self._address_equivalence_parenthesis(parenthesis)
 
+            print(f"> Apply QUANTITY UNIT Parenthesis to: '{self.quantity} {self.unit}'") if self.debug else None
+            self._address_quantity_unit_only_parenthesis(parenthesis)
 
+        # ----------------------------------- STEP 5 ------------------------------------------
+        # ---- Get the standard names of the units and secondary units ----
+        # -------------------------------------------------------------------------------------
+        print(f"Adding standard unit names for {self.unit} and {self.secondary_unit}") if self.debug else None
+
+        self._add_standard_units()
+
+        # ----------------------------------- STEP 6 ------------------------------------------
+        # ---- Prioritize weight units and always place the weight unit as the primary ingredient if it exists ----
+        # -------------------------------------------------------------------------------------
+        print(f"Prioritizing weight units") if self.debug else None
+
+        self._prioritize_weight_units()
+
+
+    def to_json(self) -> dict:
+        """
+        Convert the RecipeParser object to a dictionary.
+        Returns:
+            dict: A dictionary containing the RecipeParser object's member variables.
+        """
+        return {
+            "ingredient": self.ingredient,
+            "standardized_ingredient": self.standard_ingredient,
+            # "reduced_ingredient": self.reduced_ingredient,
+            "quantity": self.quantity,
+            "unit": self.unit,
+            "standard_unit": self.standard_unit,
+            "secondary_quantity": self.secondary_quantity,
+            "secondary_unit": self.secondary_unit,
+            "standard_secondary_unit": self.standard_secondary_unit,
+            "is_required": self.is_required,
+            "parenthesis_content": self.parenthesis_content,
+            "parenthesis_notes": self.parenthesis_notes,
+            "stashed_quantity" : self.stashed_quantity,
+            "stashed_unit" : self.stashed_unit
+        }
+
+# regex = RecipeRegexPatterns()
+
+# parenthesis = [ "(2 ounces)", 
+#                 "(about 3 cups)",
+#                 "(3)",
+#                 "(3 ounces each)", 
+#                 "(3 each)",
+#                 "(about 4 cups each)", 
+#                 "(about a couple of 3 tablespoons)", 
+#                 "(3 ounces about)"
+#                   ]
+# regex.print_matches(parenthesis[3])
+
+# ingredient = "(about a couple of 3 tablespoons)"
+# split_ingredient = ingredient.replace("(", "").replace(")", "").split()
+# print(f"split_ingredient: {split_ingredient}")
+# regex.constants.keys()
+# [i for i in split_ingredient if i in regex.constants["AP:"]]
+# for p in parenthesis:
+
+#     # parsed_p = p.replace("(", "").replace(")", "").split()
+#     # quantity_units = regex.QUANTITY_UNIT_GROUPS(p)
+#     quantity_units = regex.QUANTITY_UNIT_GROUPS.findall(p)
+#     print(f"p: {p}")
+#     print(f"quantity_units: {quantity_units}")
+#     print()
+#     # print(f"parsed_p: {parsed_p}")
 
 # ###############################################################################################################
 # ######################################## check_if_required() function ##########################################
 # ###############################################################################################################
 # ingredient = "1/4 teaspoon crushed (0.25 ounces) (required) red pepper (optional)"
 # ingredient = "1/4 teaspoon crushed red peppe"
-ingredient = "1 large yellow onion, cut into 1/4-inch-thick slices (about 3 cups)"
-# ingredient = "salmon fillets (3)"
-# # # # # ingredient = "salmon (3)"
-# # # ingredient = "2 8 ounce salmon fillets (3)"
-# # # ingredient = "2 salmon fillets (3)"
-# # # ingredient = "4 salmon fillets (8 ounces)"
-ingredient = "4 salmon fillets (8-ounces)"
+# ingredient = "1 large yellow onion, cut into 1/4-inch-thick slices (about 3 cups)"
+# # ingredient = "salmon fillets (3)"
+# # # # # # ingredient = "salmon (3)"
+# # # # ingredient = "2 8 ounce salmon fillets (3)"
+# # # # ingredient = "2 salmon fillets (3)"
+# # # # ingredient = "4 salmon fillets (8 ounces)"
+# ingredient = "4 salmon fillets (8-ounces)"
 
-# # # # # # # # # ingredient = "1/4 teaspoon crushed (optional) red pepper"
-regex = RecipeRegexPatterns()
-parser = RecipeParser(ingredient=ingredient, regex=regex, debug=False)
-parser.parse()
-parser.parenthesis_content
-parser.reduced_ingredient
-parser.is_required
-parser.best_quantity
-parser.best_unit
-parser.parenthesis_notes
+# # # # # # # # # # ingredient = "1/4 teaspoon crushed (optional) red pepper"
+# regex = RecipeRegexPatterns()
+# parser = RecipeParser(ingredient=ingredient, regex=regex, debug=False)
+# parser.parse()
+# parser.to_json()
+# parser.parenthesis_content
+# parser.reduced_ingredient
+# parser.is_required
+# parser.best_quantity
+# parser.best_unit
+# parser.parenthesis_notes
 
 # address_equivalence_parenthesis(parser.reduced_ingredient, 
 #                                   parser.parenthesis_content,
@@ -1410,8 +1900,8 @@ parser.parenthesis_notes
 #     print(f"""
 #     Ingredient: '{ingredient}'
 #     Parenthesis: '{parenthesis}'
-#     Quantity: '{self.best_quantity}'
-#     Unit: '{self.best_unit}'""")
+#     Quantity: '{self.quantity}'
+#     Unit: '{self.unit}'""")
 
 #     # parenthesis
 #     # regex.print_matches("(8- dfs ounces)")
@@ -1434,22 +1924,22 @@ parser.parenthesis_notes
 #     if not equivalent_quantity_unit:
 #         description = f"not a equivalence quantity unit parenthesis"
 #         self.parenthesis_notes.append(description)
-#         # return [self.best_quantity, self.best_unit, description]
+#         # return [self.quantity, self.unit, description]
 #         return
     
 #     # pull out the suffix word, parenthesis quantity and unit
 #     parenthesis_suffix, parenthesis_quantity, parenthesis_unit = equivalent_quantity_unit[0]
 
 #     # if no quantity AND no unit, then we can use the parenthesis quantity-unit as our quantity and unit
-#     if not self.best_quantity and not self.best_unit:
+#     if not self.quantity and not self.unit:
 #         # updated_quantity, updated_unit = quantity_unit_only[0]
 #         # [item for i in list(quantity_unit_only[0][1:]) for item in i]
 
 #         description = f"used equivalence quantity unit as our quantity and unit"
-#         self.parenthesis_notes.append(description)
+        # self.parenthesis_notes.append(description)
 
-#         self.best_quantity = parenthesis_quantity
-#         self.best_unit = parenthesis_unit
+        # self.quantity = parenthesis_quantity
+        # self.unit = parenthesis_unit
 
 #         # return [parenthesis_quantity, parenthesis_unit, description]
 #         return
@@ -1458,28 +1948,28 @@ parser.parenthesis_notes
 #     # in the parenthesis are actually a better fit for the quantities and units so 
 #     # we can use those are our quantities/units and then stash the original quantity in the "description" field 
 #     # with a "maybe quantity is " prefix in front of the original quantity for maybe use later on
-#     if self.best_quantity and not self.best_unit:
+#     if self.quantity and not self.unit:
 
 #         # stash the old quantity with a trailing string before changing best_quantity
-#         description = f"maybe quantity is: {' '.join(self.best_quantity)}"
+#         description = f"maybe quantity is: {' '.join(self.quantity)}"
 #         self.parenthesis_notes.append(description)
 
-#         self.best_quantity = parenthesis_quantity
-#         self.best_unit = parenthesis_unit
+#         self.quantity = parenthesis_quantity
+#         self.unit = parenthesis_unit
 
 #         # return [parenthesis_quantity, parenthesis_unit, description]
 #         return 
 
 #     # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are probably "better" so use the
 #     # parenthesis quantity/units and then stash the old unit in the description
-#     if not self.best_quantity and self.best_unit:
+#     if not self.quantity and self.unit:
 
 #         # stash the old quantity with a trailing "maybe"
-#         description = f"maybe unit is: {self.best_unit}"
+#         description = f"maybe unit is: {self.unit}"
 #         self.parenthesis_notes.append(description)
 
-#         self.best_quantity = parenthesis_quantity
-#         self.best_unit = parenthesis_unit
+#         self.quantity = parenthesis_quantity
+#         self.unit = parenthesis_unit
 
 #         # return [parenthesis_quantity, parenthesis_unit, description]
 #         return 
@@ -1488,16 +1978,16 @@ parser.parenthesis_notes
 #     # we will choose to use the quantity/unit pairing that is has a unit in the BASIC_UNITS_SET
 #     # Case when BOTH are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
 #     # Case when NEITHER are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
-#     if self.best_quantity and unit:
+#     if self.quantity and unit:
 #         parenthesis_unit_is_basic = parenthesis_unit in regex.constants["BASIC_UNITS_SET"]
-#         unit_is_basic = self.best_unit in regex.constants["BASIC_UNITS_SET"]
+#         unit_is_basic = self.unit in regex.constants["BASIC_UNITS_SET"]
 
 #         # Case when BOTH are basic units: 
 #         #   use the original quantity/unit (stash the parenthesis in the description)
 #         if parenthesis_unit_is_basic and unit_is_basic:
 #             description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
 #             self.parenthesis_notes.append(description)
-#             # return [self.best_quantity, self.best_unit, description]
+#             # return [self.quantity, self.unit, description]
 #             return
         
 #         # Case when NEITHER are basic units:    # TODO: this can be put into the above condition but thought separated was more readible.
@@ -1505,17 +1995,17 @@ parser.parenthesis_notes
 #         if not parenthesis_unit_is_basic and not unit_is_basic:
 #             description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
 #             self.parenthesis_notes.append(description)
-#             # return [self.best_quantity, self.best_unit, description]
+#             # return [self.quantity, self.unit, description]
 #             return
 
 #         # Case when the parenthesis unit is a basic unit (original is NOT basic unit): 
 #         #   then use the parenthesis quantity/unit (stash the original in the description)
 #         if parenthesis_unit_is_basic:
-#             description = f"maybe quantity/unit is: {self.best_quantity}/{self.best_unit}"
+#             description = f"maybe quantity/unit is: {self.quantity}/{self.unit}"
 #             self.parenthesis_notes.append(description)
 
-#             self.best_quantity = parenthesis_quantity
-#             self.best_unit = parenthesis_unit
+#             self.quantity = parenthesis_quantity
+#             self.unit = parenthesis_unit
             
 #             # return [parenthesis_quantity, parenthesis_unit, description]
 #             return
@@ -1523,11 +2013,11 @@ parser.parenthesis_notes
 #         # Case when the original unit is a basic unit (parenthesis is NOT basic unit): 
 #         #   then use the original quantity/unit (stash the parenthesis in the description)
 #         if parenthesis_unit_is_basic:
-#             description = f"maybe quantity/unit is: {self.best_quantity}/{self.best_unit}"
+#             description = f"maybe quantity/unit is: {self.quantity}/{self.unit}"
 #             self.parenthesis_notes.append(description)
 
-#             self.best_quantity = parenthesis_quantity
-#             self.best_unit = parenthesis_unit
+#             self.quantity = parenthesis_quantity
+#             self.unit = parenthesis_unit
 
 #             # return [parenthesis_quantity, parenthesis_unit, description]
 #             return
@@ -1536,260 +2026,291 @@ parser.parenthesis_notes
 #     description = f"used quantity/units from parenthesis with equivalent quantity/units"
 #     self.parenthesis_notes.append(description)
 
-#     self.best_quantity = parenthesis_quantity
-#     self.best_unit = parenthesis_unit
+#     self.quantity = parenthesis_quantity
+#     self.unit = parenthesis_unit
 #     # return [parenthesis_quantity, parenthesis_unit, description]
 #     return
 
-def address_equivalence_parenthesis(ingredient: str, parenthesis: str, quantity: str, unit: str) -> List[str]:
-    """
-    Address the case where the parenthesis content contains exactly a quantity and unit only
-    Args:
-        ingredient (str): The ingredient string to parse.
-    Returns:
-         List[str]: List of strings containing [updated quantity, updated unit, and description]
-    """
+# def address_equivalence_parenthesis(ingredient: str, parenthesis: str, quantity: str, unit: str) -> List[str]:
+#     """
+#     Address the case where the parenthesis content contains exactly a quantity and unit only
+#     Args:
+#         ingredient (str): The ingredient string to parse.
+#     Returns:
+#          List[str]: List of strings containing [updated quantity, updated unit, and description]
+#     """
 
-    # unit = parser.best_unit
-    # quantity = parser.best_quantity
-    # ingredient = parser.reduced_ingredient
-    # parenthesis = parser.parenthesis_content
+#     # unit = parser.best_unit
+#     # quantity = parser.best_quantity
+#     # ingredient = parser.reduced_ingredient
+#     # parenthesis = parser.parenthesis_content
 
-    print(f"""
-    Ingredient: '{ingredient}'
-    Parenthesis: '{parenthesis}'
-    Quantity: '{quantity}'
-    Unit: '{unit}'""")
+#     print(f"""
+#     Ingredient: '{ingredient}'
+#     Parenthesis: '{parenthesis}'
+#     Quantity: '{quantity}'
+#     Unit: '{unit}'""")
 
-    # parenthesis
-    # regex.print_matches("(8- dfs ounces)")
-    # regex.print_matches(parenthesis[0])
-    # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
+#     # parenthesis
+#     # regex.print_matches("(8- dfs ounces)")
+#     # regex.print_matches(parenthesis[0])
+#     # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
 
-    # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
-    # [regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] 
-    # [regex.QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
-    # [QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
+#     # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
+#     # [regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] 
+#     # [regex.QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
+#     # [QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
     
-    # Set a None Description
-    description = None
+#     # Set a None Description
+#     description = None
 
-    # check for the equivelency pattern (e.g. "<equivelent string> <quantity> <unit>" )
-    equivalent_quantity_unit = [item for i in [regex.EQUIV_QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] for item in i]
+#     # check for the equivelency pattern (e.g. "<equivelent string> <quantity> <unit>" )
+#     equivalent_quantity_unit = [item for i in [regex.EQUIV_QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] for item in i]
 
-    # if there is NO equivelence quantity unit matches, then just return the original ingredient
-    if not equivalent_quantity_unit:
-        return [quantity, unit, description]
+#     # if there is NO equivelence quantity unit matches, then just return the original ingredient
+#     if not equivalent_quantity_unit:
+#         return [quantity, unit, description]
     
-    # pull out the suffix word, parenthesis quantity and unit
-    parenthesis_suffix, parenthesis_quantity, parenthesis_unit = equivalent_quantity_unit[0]
+#     # pull out the suffix word, parenthesis quantity and unit
+#     parenthesis_suffix, parenthesis_quantity, parenthesis_unit = equivalent_quantity_unit[0]
 
-    # if no quantity AND no unit, then we can use the parenthesis quantity-unit as our quantity and unit
-    if not quantity and not unit:
-        # updated_quantity, updated_unit = quantity_unit_only[0]
-        # [item for i in list(quantity_unit_only[0][1:]) for item in i]
-        return [parenthesis_quantity, parenthesis_unit, description]
+#     # if no quantity AND no unit, then we can use the parenthesis quantity-unit as our quantity and unit
+#     if not quantity and not unit:
+#         # updated_quantity, updated_unit = quantity_unit_only[0]
+#         # [item for i in list(quantity_unit_only[0][1:]) for item in i]
+#         return [parenthesis_quantity, parenthesis_unit, description]
     
-    # if there is a quantity but no unit, we can assume the equivelent quantity units 
-    # in the parenthesis are actually a better fit for the quantities and units so 
-    # we can use those are our quantities/units and then stash the original quantity in the "description" field 
-    # with a "maybe quantity is " prefix in front of the original quantity for maybe use later on
-    if quantity and not unit:
+#     # if there is a quantity but no unit, we can assume the equivelent quantity units 
+#     # in the parenthesis are actually a better fit for the quantities and units so 
+#     # we can use those are our quantities/units and then stash the original quantity in the "description" field 
+#     # with a "maybe quantity is " prefix in front of the original quantity for maybe use later on
+#     if quantity and not unit:
 
-        # stash the old quantity with a trailing "maybe"
-        description = f"maybe quantity is: {' '.join(quantity)}"
+#         # stash the old quantity with a trailing "maybe"
+#         description = f"maybe quantity is: {' '.join(quantity)}"
 
-        return [parenthesis_quantity, parenthesis_unit, description]
+#         return [parenthesis_quantity, parenthesis_unit, description]
 
-    # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are probably "better" so use the
-    # parenthesis quantity/units and then stash the old unit in the description
-    if not quantity and unit:
-        # stash the old quantity with a trailing "maybe"
-        description = f"maybe unit is: {unit}"
+#     # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are probably "better" so use the
+#     # parenthesis quantity/units and then stash the old unit in the description
+#     if not quantity and unit:
+#         # stash the old quantity with a trailing "maybe"
+#         description = f"maybe unit is: {unit}"
 
-        return [parenthesis_quantity, parenthesis_unit, description]
+#         return [parenthesis_quantity, parenthesis_unit, description]
 
-    # if we already have a quantity AND a unit, then we likely found an equivalent quantity/unit
-    # we will choose to use the quantity/unit pairing that is has a unit in the BASIC_UNITS_SET
-    # Case when BOTH are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
-    # Case when NEITHER are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
-    if quantity and unit:
-        parenthesis_unit_is_basic = parenthesis_unit in regex.constants["BASIC_UNITS_SET"]
-        unit_is_basic = unit in regex.constants["BASIC_UNITS_SET"]
+#     # if we already have a quantity AND a unit, then we likely found an equivalent quantity/unit
+#     # we will choose to use the quantity/unit pairing that is has a unit in the BASIC_UNITS_SET
+#     # Case when BOTH are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
+#     # Case when NEITHER are basic units: then we will use the original quantity/unit (# TODO: Maybe we should use parenthesis quantity/unit instead...?)
+#     if quantity and unit:
+#         parenthesis_unit_is_basic = parenthesis_unit in regex.constants["BASIC_UNITS_SET"]
+#         unit_is_basic = unit in regex.constants["BASIC_UNITS_SET"]
 
-        # Case when BOTH are basic units: 
-        #   use the original quantity/unit (stash the parenthesis in the description)
-        if parenthesis_unit_is_basic and unit_is_basic:
-            description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
-            return [quantity, unit, description]
+#         # Case when BOTH are basic units: 
+#         #   use the original quantity/unit (stash the parenthesis in the description)
+#         if parenthesis_unit_is_basic and unit_is_basic:
+#             description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
+#             return [quantity, unit, description]
         
-        # Case when NEITHER are basic units:    # TODO: this can be put into the above condition but thought separated was more readible.
-        #   use the original quantity/unit (stash the parenthesis in the description)
-        if not parenthesis_unit_is_basic and not unit_is_basic:
-            description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
-            return [quantity, unit, description]
+#         # Case when NEITHER are basic units:    # TODO: this can be put into the above condition but thought separated was more readible.
+#         #   use the original quantity/unit (stash the parenthesis in the description)
+#         if not parenthesis_unit_is_basic and not unit_is_basic:
+#             description = f"maybe quantity/unit is: {parenthesis_quantity}/{parenthesis_unit}"
+#             return [quantity, unit, description]
 
-        # Case when the parenthesis unit is a basic unit (original is NOT basic unit): 
-        #   then use the parenthesis quantity/unit (stash the original in the description)
-        if parenthesis_unit_is_basic:
-            description = f"maybe quantity/unit is: {quantity}/{unit}"
-            return [parenthesis_quantity, parenthesis_unit, description]
+#         # Case when the parenthesis unit is a basic unit (original is NOT basic unit): 
+#         #   then use the parenthesis quantity/unit (stash the original in the description)
+#         if parenthesis_unit_is_basic:
+#             description = f"maybe quantity/unit is: {quantity}/{unit}"
+#             return [parenthesis_quantity, parenthesis_unit, description]
         
-        # Case when the original unit is a basic unit (parenthesis is NOT basic unit): 
-        #   then use the original quantity/unit (stash the parenthesis in the description)
-        if parenthesis_unit_is_basic:
-            description = f"maybe quantity/unit is: {quantity}/{unit}"
-            return [parenthesis_quantity, parenthesis_unit, description]
+#         # Case when the original unit is a basic unit (parenthesis is NOT basic unit): 
+#         #   then use the original quantity/unit (stash the parenthesis in the description)
+#         if parenthesis_unit_is_basic:
+#             description = f"maybe quantity/unit is: {quantity}/{unit}"
+#             return [parenthesis_quantity, parenthesis_unit, description]
 
-    # return [quantity, unit, description]
-    description = f"used quantity/units from parenthesis with equivalent quantity/units"
-    return [parenthesis_quantity, parenthesis_unit, description]
+#     # return [quantity, unit, description]
+#     description = f"used quantity/units from parenthesis with equivalent quantity/units"
+#     return [parenthesis_quantity, parenthesis_unit, description]
 
 
-# # # unit = parser.best_unit
-# # # quant = parser.best_quantity
-def address_quantity_unit_only_parenthesis(ingredient: str, parenthesis: str, quantity: str, unit: str) -> List[str]:
-    """
-    Address the case where the parenthesis content contains exactly a quantity and unit only
-    Args:
-        ingredient (str): The ingredient string to parse.
-    Returns:
-         List[str]: List of strings containing [updated quantity, updated unit, and description]
-    """
+# # # # unit = parser.best_unit
+# # # # quant = parser.best_quantity
+# def _address_quantity_unit_only_parenthesis(self, parenthesis: str) -> None:
+#     """
+#     Address the case where the parenthesis content contains exactly a quantity and unit only
+#     Args:
+#         ingredient (str): The ingredient string to parse.
+#     Returns:
+#         None
+#     """
 
-    # unit = parser.best_unit
-    # quantity = parser.best_quantity
-    # ingredient = parser.reduced_ingredient
-    # parenthesis = parser.parenthesis_content
+#     # unit = parser.best_unit
+#     # quantity = parser.best_quantity
+#     # ingredient = parser.reduced_ingredient
+#     # parenthesis = parser.parenthesis_content
 
-    print(f"""
-    Ingredient: '{ingredient}'
-    Parenthesis: '{parenthesis}'
-    Quantity: '{quantity}'
-    Unit: '{unit}'""")
+#     print(f"""
+#     Ingredient: '{self.reduced_ingredient}'
+#     Parenthesis: '{parenthesis}'
+#     Quantity: '{self.quantity}'
+#     Unit: '{self.unit}'""")
 
-    # parenthesis
-    # regex.print_matches("(8- dfs ounces)")
-    # regex.print_matches(parenthesis[0])
-    # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
+#     # parenthesis
+#     # regex.print_matches("(8- dfs ounces)")
+#     # regex.print_matches(parenthesis[0])
+#     # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
 
-    # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
-    # [regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] 
-    # [regex.QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
-    # [QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
+#     # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
+#     # [regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] 
+#     # [regex.QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
+#     # [QUANTITY_UNIT_ONLY_GROUPS.findall(i) for i in parenthesis] 
     
-    # Set a None Description
-    description = None
+#     # Set a None Description
+#     description = None
 
-    quantity_unit_only = [item for i in [regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] for item in i]
+#     quantity_unit_only = self.regex.QUANTITY_UNIT_GROUPS.findall(parenthesis)
+#     # quantity_unit_only = [item for i in [self.regex.QUANTITY_UNIT_GROUPS.findall(i) for i in parenthesis] for item in i]
 
-    # if no numbers only parenthesis, then just return the original ingredient
-    if not quantity_unit_only:
-        return [quantity, unit, description]
+#     # if no numbers only parenthesis, then just return the original ingredient
+#     if not quantity_unit_only:
+#         description = f"not a quantity unit only parenthesis"
+#         self.parenthesis_notes.append(description)
+#         # return [self.quantity, unit, description]
+#         return
     
-    # pull out the parenthesis quantity and unit
-    parenthesis_quantity, parenthesis_unit = quantity_unit_only[0]
+#     # pull out the parenthesis quantity and unit
+#     parenthesis_quantity, parenthesis_unit = quantity_unit_only[0]
 
-    # if no quantity AND no unit, then we can use the parenthesis quantity-unit as our quantity and unit
-    if not quantity and not unit:
-        # updated_quantity, updated_unit = quantity_unit_only[0]
-        # [item for i in list(quantity_unit_only[0][1:]) for item in i]
-        return [parenthesis_quantity, parenthesis_unit, description]
+#     # if no quantity AND no unit, then we can use the parenthesis self.quantity-unit as our self.quantity and unit
+#     if not self.quantity and not self.unit:
+#         # updated_quantity, updated_unit = quantity_unit_only[0]
+
+#         description = f"used quantity/unit from parenthesis with no quantity/unit"
+#         self.parenthesis_notes.append(description)
+
+#         self.quantity = parenthesis_quantity
+#         self.unit = parenthesis_unit
+
+#         # return [parenthesis_quantity, parenthesis_unit, description]
+#         return
     
-    # if there is a quantity but no unit, we can try to merge (multiply) the current quantity and the parenthesis quantity 
-    # then use the unit in the parenthesis
-    if quantity and not unit:
-        # quantity_unit_only[0][0]
-        updated_quantity = str(float(quantity) * float(parenthesis_quantity))
+#     # if there is a quantity but no unit, we can try to merge (multiply) the current quantity and the parenthesis quantity 
+#     # then use the unit in the parenthesis
+#     if self.quantity and not self.unit:
+#         # quantity_unit_only[0][0]
+#         updated_quantity = str(float(self.quantity) * float(parenthesis_quantity))
 
-        return [updated_quantity, parenthesis_unit, description]
+#         description = f"multiplied starting quantity with parenthesis quantity"
+#         self.parenthesis_notes.append(description)
 
-    # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are either:
-    # 1. A description/note (i.e. cut 0.5 inch slices)
-    # 2. A quantity and unit (i.e. 2 ounces)
-    # either case, just return the parenthesis units to use those
-    if not quantity and unit:
-        return [parenthesis_quantity, parenthesis_unit, description]
+#         self.quantity = updated_quantity
+#         self.unit = parenthesis_unit
 
-    # if we already have a quantity AND a unit, then we likely just found a description and that is all.
-    if quantity and unit:
-        # use the parenthesis values as a description and join the values together 
-        description = f"maybe quantity/unit is: {' '.join(quantity_unit_only[0])}"
-        # description = ' '.join(quantity_unit_only[0])
+#         # return [updated_quantity, parenthesis_unit, description]
+#         return
 
-        return [quantity, unit, description]
+#     # if there is no quantity BUT there IS a unit, then the parenthesis units/quantities are either:
+#     # 1. A description/note (i.e. cut 0.5 inch slices)
+#     # 2. A quantity and unit (i.e. 2 ounces)
+#     # either case, just return the parenthesis units to use those
+#     if not self.quantity and self.unit:
+        
+#         description = f"No quantity but has units, used parenthesis. maybe quantity/unit is: {self.quantity}/{self.unit}"
+#         self.parenthesis_notes.append(description)
+
+#         self.quantity = parenthesis_quantity
+#         self.unit = parenthesis_unit
+
+#         # return [parenthesis_quantity, parenthesis_unit, description]
+#         return
+
+#     # if we already have a quantity AND a unit, then we likely just found a description and that is all.
+#     if self.quantity and self.unit:
+#         # use the parenthesis values as a description and join the values together 
+#         description = f"maybe quantity/unit is: {' '.join(quantity_unit_only[0])}"
+#         self.parenthesis_notes.append(description)
+#         # return [self.quantity, unit, description]
+#         return
     
-    description = f"used quantity/units from parenthesis with quantity/units only"
-    return [parenthesis_quantity, parenthesis_unit, description]
+#     description = f"used quantity/units from parenthesis with quantity/units only"
+#     self.parenthesis_notes.append(description)
 
-def address_quantity_only_parenthesis(ingredient: str, parenthesis: str, quantity: str, unit: str) -> List[str]:
-    """
-    Address the case where the parenthesis content only contains a quantity.
-    Args:
-        ingredient (str): The ingredient string to parse.
+#     self.quantity = parenthesis_quantity
+#     self.unit = parenthesis_unit
+#     # return [parenthesis_quantity, parenthesis_unit, description]
+#     return
 
-    Returns:
-        List[str]: List of strings containing [updated quantity, updated unit, and description]
-    """
+# def address_quantity_only_parenthesis(ingredient: str, parenthesis: str, quantity: str, unit: str) -> List[str]:
+#     """
+#     Address the case where the parenthesis content only contains a quantity.
+#     Args:
+#         ingredient (str): The ingredient string to parse.
 
-    # unit = parser.best_unit
-    # quantity = parser.best_quantity
-    # reduced = parser.reduced_ingredient
-    # parenthesis = parser.parenthesis_content
+#     Returns:
+#         List[str]: List of strings containing [updated quantity, updated unit, and description]
+#     """
 
-    print(f"""
-    Ingredient: '{ingredient}'
-    Parenthesis: '{parenthesis}'
-    Quantity: '{quantity}'
-    Unit: '{unit}'""")
+#     # unit = parser.best_unit
+#     # quantity = parser.best_quantity
+#     # reduced = parser.reduced_ingredient
+#     # parenthesis = parser.parenthesis_content
 
-    # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
+#     print(f"""
+#     Ingredient: '{ingredient}'
+#     Parenthesis: '{parenthesis}'
+#     Quantity: '{quantity}'
+#     Unit: '{unit}'""")
 
-    # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
+#     # parenthesis = ["(optional)", "(2 ounces)", "(about 3 cups)", "(3)"]
+
+#     # [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
     
-    # Set a None Description
-    description = None
+#     # Set a None Description
+#     description = None
 
-    # pull out the parenthesis quantity values
-    numbers_only = [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
+#     # pull out the parenthesis quantity values
+#     numbers_only = [item for i in [regex.PARENTHESIS_WITH_NUMBERS_ONLY.findall(i) for i in parenthesis] for item in i]
 
-    # if no numbers only parenthesis, then just return the original ingredient
-    if not numbers_only:
-        return [quantity, unit, description]
+#     # if no numbers only parenthesis, then just return the original ingredient
+#     if not numbers_only:
+#         return [quantity, unit, description]
 
-    # pull out the quantity from the parenthesis
-    parenthesis_quantity = numbers_only[0]
+#     # pull out the quantity from the parenthesis
+#     parenthesis_quantity = numbers_only[0]
 
-    # if there is not a unit or a quantity, then we can use the parenthesis number as the quantity and
-    #  return the ingredient with the new quantity
-    # TODO: OR the unit MIGHT be the food OR might be a "SOMETIMES_UNIT", maybe do that check here, not sure yet...
-    if not quantity and not unit:
-        # updated_quantity = numbers_only[0]
-        description = f"maybe unit is: the 'food' or a 'sometimes unit'"
-        return [parenthesis_quantity, unit, description]
+#     # if there is not a unit or a quantity, then we can use the parenthesis number as the quantity and
+#     #  return the ingredient with the new quantity
+#     # TODO: OR the unit MIGHT be the food OR might be a "SOMETIMES_UNIT", maybe do that check here, not sure yet...
+#     if not quantity and not unit:
+#         # updated_quantity = numbers_only[0]
+#         description = f"maybe unit is: the 'food' or a 'sometimes unit'"
+#         return [parenthesis_quantity, unit, description]
     
-    # if there is a quantity but no unit, we can try to merge (multiply) the current quantity and the parenthesis quantity 
-    # then the unit is also likely the food 
-    # TODO: OR the unit MIGHT be the food OR might be a "SOMETIMES_UNIT", maybe do that check here, not sure yet...
-    if quantity and not unit:
-        updated_quantity = str(float(quantity) * float(parenthesis_quantity))
-        description = f"maybe unit is: the 'food' or a 'sometimes unit'"
-        return [updated_quantity, unit, description]
+#     # if there is a quantity but no unit, we can try to merge (multiply) the current quantity and the parenthesis quantity 
+#     # then the unit is also likely the food 
+#     # TODO: OR the unit MIGHT be the food OR might be a "SOMETIMES_UNIT", maybe do that check here, not sure yet...
+#     if quantity and not unit:
+#         updated_quantity = str(float(quantity) * float(parenthesis_quantity))
+#         description = f"maybe unit is: the 'food' or a 'sometimes unit'"
+#         return [updated_quantity, unit, description]
 
-    # if there is a unit but no quantity, then we can use the parenthesis number as the quantity and 
-    # return the ingredient with the new quantity
-    if not quantity and unit:
-        # updated_quantity = numbers_only[0]
-        return [parenthesis_quantity, unit, description]
+#     # if there is a unit but no quantity, then we can use the parenthesis number as the quantity and 
+#     # return the ingredient with the new quantity
+#     if not quantity and unit:
+#         # updated_quantity = numbers_only[0]
+#         return [parenthesis_quantity, unit, description]
 
-    if quantity and unit:
-        # if there is a quantity and a unit, then we can try to merge (multiply) the current quantity and the parenthesis quantity
-        # then return the ingredient with the new quantity
-        updated_quantity = str(float(quantity) * float(parenthesis_quantity))
-        return [updated_quantity, unit, description]
+#     if quantity and unit:
+#         # if there is a quantity and a unit, then we can try to merge (multiply) the current quantity and the parenthesis quantity
+#         # then return the ingredient with the new quantity
+#         updated_quantity = str(float(quantity) * float(parenthesis_quantity))
+#         return [updated_quantity, unit, description]
 
-    description = f"used quantity from parenthesis with quantity only"
-    return [parenthesis_quantity, unit, description]
+#     description = f"used quantity from parenthesis with quantity only"
+#     return [parenthesis_quantity, unit, description]
 
 
 # ###############################################################################################################

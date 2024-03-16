@@ -3,20 +3,15 @@ import pytest
 
 import re
 
-# import lambda_containers.extract_ingredients.parser.regex_patterns as regex_patterns
-# from lambda_containers.extract_ingredients.parser.regex_patterns import RecipeRegexPatterns
-# from lambda_containers.extract_ingredients.parser.recipe_parser import RecipeParser
-# import climatePy._utils as climatePy
-
 # import lambda_containers.extract_ingredients
-
 # import parser.regex_patterns as regex_patterns
 # from parser.regex_patterns import RecipeRegexPatterns
 # import parser.regex_patterns as regex_patterns
 
 # from recipe_parser import RecipeRegexPatterns
 from lambda_containers.extract_ingredients.recipe_parser import RecipeRegexPatterns
-regex_map = RecipeRegexPatterns()
+
+# regex_map = RecipeRegexPatterns()
 
 @pytest.fixture
 def regex_map():
@@ -227,7 +222,7 @@ def test_EQUIV_QUANTITY_UNIT_GROUPS(regex_map):
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("roughly 3 lbs of apples") == [('roughly', '3', 'lbs')]
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("est. 100 grams of flour") == [('est', '100', 'grams')]
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estimated 2 liters of water") == [('estimated', '2', 'liters')]
-    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim 1/2 3/4 5/6 7/8 9/10 cups") == [('estim ', '1/2', 'cups')] # TODO: need to clean up this extra whitespace after the approximate unit string
+    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim 1/2 3/4 5/6 7/8 9/10 cups") == [('estim', '1/2', 'cups')] # TODO: need to clean up this extra whitespace after the approximate unit string
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("approx 1/2 3/4 5/6 7/8 9/10 cups tablespoons") == [('approx', '1/2', 'cups')]
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("about 17/8 9/10 cups tablespoons") == [('about', '17/8', 'cups')]
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("around 2.555 cups tablespoons") == [('around', '2.555', 'cups')]
@@ -245,7 +240,7 @@ def test_EQUIV_QUANTITY_UNIT_GROUPS(regex_map):
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("around Prepare a batter with 1.5 cups of milk, 1/4 cup of sugar, and 2 tablespoons of melted butter.") == [('around', '1.5', 'cups')] # TODO: maybe need to rework this so it matches the output of the commented out test below:
     # assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("around Prepare a batter with 1.5 cups of milk, 1/4 cup of sugar, and 2 tablespoons of melted butter.") == [('around', '1.5', 'cups'), ('around', '1/4', 'cup'), ('around', '2', 'tablespoons')]
 
-    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim For the sauce, mix 300 ml of cream with 50 grams of grated cheese and a pinch of salt.") == [('estim ', '300', 'ml')]
+    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim For the sauce, mix 300 ml of cream with 50 grams of grated cheese and a pinch of salt.") == [('estim', '300', 'ml')]
 
     # more cases of basic AND non basic units in the same string
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("about 2 pkgs, 44 strips of bacon") == [('about', '2', 'pkgs')]
@@ -255,8 +250,8 @@ def test_EQUIV_QUANTITY_UNIT_GROUPS(regex_map):
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("about 2 diced cups of onions, 13 12lb yogurts , 44 apples, and 1/2 a stick of butter") == [('about', '2', 'cups')] # TODO: Fix needed, this should match [('about', '2', 'cups'), ('about', '13', 'lb'), ('about', '1/2', 'stick')]
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("approximately 2 diced cups of onions, 12lbs yogurts , 44 apples, and 1/2 a stick of butter") == [('approximately', '2', 'cups')] # TODO: this is a really odd, badly written string, not sure if it should match anything / its just okay that it fails to correctly get what we need 
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("about 2 stalks of celery") == [('about', '2', 'stalks')]
-    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim cups tablespoons cups tablespoons 11.22.55dsdf strips") == [('estim ', '11.22', 'strips')]
-    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim cups tablespoons 12cups tablespoons 11.22.55dsdf strips") == [('estim ', '12', 'tablespoons')] # TODO:need to fix spacing after estim
+    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim cups tablespoons cups tablespoons 11.22.55dsdf strips") == [('estim', '11.22', 'strips')]
+    assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim cups tablespoons 12cups tablespoons 11.22.55dsdf strips") == [('estim', '12', 'tablespoons')] # TODO:need to fix spacing after estim
 
     # no match cases
     assert regex_map.EQUIV_QUANTITY_UNIT_GROUPS.findall("estim cans tablespoons cans tablespoonsints") == []

@@ -25,7 +25,7 @@ def test_units_pattern(regex_map):
     assert regex_map.UNITS_PATTERN.findall("1/2 cup of milk and 4 large stalks of lettuce") == ['cup', 'stalks']
 
     assert regex_map.UNITS_PATTERN.findall("cup cup cup cup") == ['cup', 'cup', 'cup', 'cup']
-    assert regex_map.UNITS_PATTERN.findall("cups tbs tablespoon ml ML mm") == ['cups', 'tbs', 'tablespoon', 'ml', 'ML', 'mm']
+    assert regex_map.UNITS_PATTERN.findall("cups tbs tablespoon ml ML mm") == ['cups', 'tbs', 'tablespoon', 'ml', 'ML'] # NOTE: mm is not a unit for now (removed with other dimension like units (i.e. inches, feet, etc.))
 
     assert regex_map.UNITS_PATTERN.findall("1cup") == []
     assert regex_map.UNITS_PATTERN.findall("1 cup") == ['cup']
